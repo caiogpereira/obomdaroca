@@ -1,0 +1,153 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { Pedido } from '../types';
+
+// POST /api/atendimentos - Receber dados do n8n
+// Estrutura esperada: { cliente: string, telefone: string, email?: string, tipo_solicitacao: string, descricao: string, status: string, prioridade: string }
+
+// GET /api/metricas?periodo=7d - Buscar métricas
+// Parâmetros: periodo (hoje, ontem, 7dias, semana, mes, personalizado)
+// Resposta: Array de objetos Metric
+
+// GET /api/pedidos-pendentes - Listar pedidos não finalizados
+// Resposta: Array de objetos Pedido com status != 'Finalizado'
+
+// PUT /api/pedidos/:id - Atualizar pedido
+// Body: Pedido completo
+// Resposta: Pedido atualizado
+
+// POST /api/pedidos/:id/finalizar - Finalizar pedido
+// Resposta: Pedido com status = 'Finalizado'
+
+export const useSupabasePedidos = () => {
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPedidos = async () => {
+    try {
+      setLoading(true);
+      const { data: pedidosData, error: pedidosError } = await supabase
+        .from('pedidos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (pedidosError) throw pedidosError;
+
+      const pedidosComItens = await Promise.all(
+        (pedidosData || []).map(async (pedido) => {
+          const { data: itensData } = await supabase
+            .from('itens_pedido')
+            .select('*')
+            .eq('pedido_id', pedido.id);
+
+          return {
+            id: pedido.id,
+            numero_pedido: pedido.numero_pedido,
+            cliente: pedido.cliente,
+            telefone: pedido.telefone,
+            email: pedido.email || '',
+            valor_total: parseFloat(pedido.valor_total),
+            status: pedido.status as Pedido['status'],
+            observacoes: pedido.observacoes || '',
+            created_at: pedido.created_at,
+            updated_at: pedido.updated_at,
+            itens: (itensData || []).map((item) => ({
+              id: item.id,
+              pedido_id: item.pedido_id,
+              produto_id: item.produto_id,
+              produto_nome: item.produto_nome,
+              quantidade: item.quantidade,
+              preco_unitario: parseFloat(item.preco_unitario),
+              desconto_percentual: item.desconto_percentual ? parseFloat(item.desconto_percentual) : 0,
+              preco_original: item.preco_original ? parseFloat(item.preco_original) : parseFloat(item.preco_unitario),
+            })),
+          } as Pedido;
+        })
+      );
+
+      setPedidos(pedidosComItens);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar pedidos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const atualizarStatusPedido = async (pedidoId: string, newStatus: Pedido['status']) => {
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', pedidoId);
+
+      if (error) throw error;
+
+      setPedidos((prev) =>
+        prev.map((p) =>
+          p.id === pedidoId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p
+        )
+      );
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar status');
+    }
+  };
+
+  const finalizarPedido = async (pedidoId: string) => {
+    await atualizarStatusPedido(pedidoId, 'Finalizado');
+  };
+
+  const atualizarPedido = async (pedidoAtualizado: Pedido) => {
+    try {
+      const { error: pedidoError } = await supabase
+        .from('pedidos')
+        .update({
+          cliente: pedidoAtualizado.cliente,
+          telefone: pedidoAtualizado.telefone,
+          email: pedidoAtualizado.email,
+          valor_total: pedidoAtualizado.valor_total,
+          status: pedidoAtualizado.status,
+          observacoes: pedidoAtualizado.observacoes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pedidoAtualizado.id);
+
+      if (pedidoError) throw pedidoError;
+
+      await supabase.from('itens_pedido').delete().eq('pedido_id', pedidoAtualizado.id);
+
+      for (const item of pedidoAtualizado.itens) {
+        const { error: itemError } = await supabase.from('itens_pedido').insert({
+          pedido_id: pedidoAtualizado.id,
+          produto_id: item.produto_id,
+          produto_nome: item.produto_nome,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco_unitario,
+          desconto_percentual: item.desconto_percentual || 0,
+          preco_original: item.preco_original || item.preco_unitario,
+        });
+
+        if (itemError) throw itemError;
+      }
+
+      await fetchPedidos();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar pedido');
+    }
+  };
+
+  useEffect(() => {
+    fetchPedidos();
+  }, []);
+
+  return {
+    pedidos,
+    loading,
+    error,
+    finalizarPedido,
+    atualizarPedido,
+    atualizarStatusPedido,
+    refetch: fetchPedidos,
+  };
+};
