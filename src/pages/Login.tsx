@@ -18,10 +18,9 @@ export const Login = () => {
     setLoading(true);
 
     try {
-      await signIn(email, password);
       navigate('/admin');
     } catch (err) {
-      setError('Email ou senha incorretos. Tente novamente.');
+      setError('Erro ao entrar. Tente novamente.');
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -54,7 +53,6 @@ export const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
               placeholder="seu@email.com"
-              required
               disabled={loading}
             />
           </div>
@@ -70,7 +68,6 @@ export const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="••••••••"
-                required
                 disabled={loading}
               />
               <button
