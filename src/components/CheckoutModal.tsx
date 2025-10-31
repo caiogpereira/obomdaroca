@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { X, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Send, Lock, Check, AlertCircle } from 'lucide-react';
 import { CarrinhoItem, ModalidadePagamento } from '../types';
+import { validatePricingRules, getBestAvailablePaymentMethod } from '../utils/pricingValidation';
 
 interface CheckoutModalProps {
   items: CarrinhoItem[];
@@ -13,13 +14,24 @@ export const CheckoutModal = ({
   onClose,
   onConfirm,
 }: CheckoutModalProps) => {
-  const [modalidade, setModalidade] = useState<ModalidadePagamento>('cartao');
+  const availability = validatePricingRules(items);
+  const [modalidade, setModalidade] = useState<ModalidadePagamento>(() =>
+    getBestAvailablePaymentMethod(availability)
+  );
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
     endereco: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const currentAvailability = validatePricingRules(items);
+    if (!currentAvailability[modalidade].isValid) {
+      const bestMethod = getBestAvailablePaymentMethod(currentAvailability);
+      setModalidade(bestMethod);
+    }
+  }, [items, modalidade]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -36,8 +48,21 @@ export const CheckoutModal = ({
       newErrors.endereco = 'Endereço é obrigatório';
     }
 
+    const currentAvailability = validatePricingRules(items);
+    if (!currentAvailability[modalidade].isValid) {
+      newErrors.modalidade = currentAvailability[modalidade].reason || 'Modalidade de pagamento indisponível';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleModalidadeClick = (value: ModalidadePagamento) => {
+    const currentAvailability = validatePricingRules(items);
+    if (currentAvailability[value].isValid) {
+      setModalidade(value);
+      setErrors({ ...errors, modalidade: '' });
+    }
   };
 
   const getPreco = (item: CarrinhoItem): number => {
@@ -95,55 +120,60 @@ export const CheckoutModal = ({
           <div className="mb-6">
             <h3 className="font-medium text-gray-900 mb-3">Selecione a Modalidade de Pagamento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <button
-                type="button"
-                onClick={() => setModalidade('cartao')}
-                className={`p-3 border-2 rounded-lg text-left transition-all ${
-                  modalidade === 'cartao'
-                    ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium text-gray-900">Cartão/Varejo</div>
-                <div className="text-xs text-gray-500 mt-1">Sem quantidade mínima</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalidade('pix')}
-                className={`p-3 border-2 rounded-lg text-left transition-all ${
-                  modalidade === 'pix'
-                    ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium text-gray-900">PIX/TED</div>
-                <div className="text-xs text-gray-500 mt-1">Min. R$ 300 ou 10 unidades</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalidade('dinheiro')}
-                className={`p-3 border-2 rounded-lg text-left transition-all ${
-                  modalidade === 'dinheiro'
-                    ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium text-gray-900">Dinheiro</div>
-                <div className="text-xs text-gray-500 mt-1">Min. R$ 500 ou 15 unidades</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalidade('oferta')}
-                className={`p-3 border-2 rounded-lg text-left transition-all ${
-                  modalidade === 'oferta'
-                    ? 'border-red-600 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium text-gray-900">Oferta</div>
-                <div className="text-xs text-gray-500 mt-1">30 unidades (pagamento em dinheiro)</div>
-              </button>
+              {[
+                { value: 'cartao' as ModalidadePagamento, label: 'Cartão/Varejo', desc: 'Sem quantidade mínima' },
+                { value: 'pix' as ModalidadePagamento, label: 'PIX/TED', desc: 'Min. R$ 300 ou 10 unidades do mesmo produto' },
+                { value: 'dinheiro' as ModalidadePagamento, label: 'Dinheiro', desc: 'Min. R$ 500 ou 15 unidades do mesmo produto' },
+                { value: 'oferta' as ModalidadePagamento, label: 'Oferta', desc: '30 unidades do mesmo produto' },
+              ].map((mod) => {
+                const currentAvailability = validatePricingRules(items);
+                const isAvailable = currentAvailability[mod.value].isValid;
+                const validation = currentAvailability[mod.value];
+                return (
+                  <div key={mod.value}>
+                    <button
+                      type="button"
+                      onClick={() => handleModalidadeClick(mod.value)}
+                      disabled={!isAvailable}
+                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
+                        modalidade === mod.value
+                          ? 'border-red-600 bg-red-50'
+                          : isAvailable
+                          ? 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-gray-900">{mod.label}</div>
+                        {isAvailable ? (
+                          <Check className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <Lock className="w-5 h-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{mod.desc}</div>
+                    </button>
+                    {!isAvailable && validation.reason && (
+                      <div className="mt-1 text-xs text-red-600 flex items-start gap-1">
+                        <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{validation.reason}</span>
+                      </div>
+                    )}
+                    {!isAvailable && validation.suggestion && (
+                      <div className="mt-0.5 text-xs text-blue-600">
+                        {validation.suggestion}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+            {errors.modalidade && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{errors.modalidade}</span>
+              </div>
+            )}
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Modalidade selecionada:</span>
