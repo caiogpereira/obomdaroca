@@ -113,6 +113,16 @@ export const Login = () => {
           <p>Precisa de acesso?</p>
           <p>Entre em contato com o administrador</p>
         </div>
+
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/catalogo')}
+            className="text-red-600 hover:text-red-700 font-medium text-sm transition-colors"
+          >
+            Acessar Catálogo de Produtos
+          </button>
+        </div>
       </div>
     </div>
   );
