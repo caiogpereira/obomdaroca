@@ -135,12 +135,12 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     const numValue = parseFloat(value) || 0;
                     setFormData({ ...formData, preco: numValue });
                   }}
-                  onFocus={(e) => {
+                  onFocus={() => {
                     if (precoDisplay === '' || parseFloat(precoDisplay) === 0) {
                       setPrecoDisplay('');
                     }
                   }}
-                  onBlur={(e) => {
+                  onBlur={() => {
                     const numValue = parseFloat(precoDisplay) || 0;
                     setPrecoDisplay(numValue > 0 ? numValue.toFixed(2) : '');
                   }}

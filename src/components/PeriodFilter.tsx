@@ -17,16 +17,10 @@ const filtros: { label: string; value: Periodo }[] = [
 ];
 
 export const PeriodFilter = ({ periodo, onChange }: PeriodFilterProps) => {
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [dataInicial, setDataInicial] = useState('');
   const [dataFinal, setDataFinal] = useState('');
 
   const handlePeriodoChange = (value: Periodo) => {
-    if (value === 'personalizado') {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(false);
-    }
     onChange(value);
   };
 

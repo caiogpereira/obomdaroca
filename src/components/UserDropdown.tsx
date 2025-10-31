@@ -1,4 +1,4 @@
-import { User, Settings, Key, LogOut } from 'lucide-react';
+import { Settings, Key, LogOut } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 interface UserDropdownProps {

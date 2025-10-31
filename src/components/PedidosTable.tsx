@@ -5,6 +5,7 @@ import { PedidoModal } from './PedidoModal';
 
 interface PedidosTableProps {
   pedidos: Pedido[];
+  produtos?: any[];
   totalPedidos: number;
   searchTerm: string;
   onSearchChange: (term: string) => void;
@@ -15,6 +16,7 @@ interface PedidosTableProps {
 
 export const PedidosTable = ({
   pedidos,
+  produtos = [],
   totalPedidos,
   searchTerm,
   onSearchChange,
@@ -146,6 +148,7 @@ export const PedidosTable = ({
       {modalOpen && selectedPedido && (
         <PedidoModal
           pedido={selectedPedido}
+          produtos={produtos}
           mode={modalMode}
           onClose={() => setModalOpen(false)}
           onSave={onAtualizarPedido}

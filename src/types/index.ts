@@ -15,6 +15,10 @@ export interface Pedido {
   status: 'Novo' | 'Em Atendimento' | 'Finalizado';
   itens: ItemPedido[];
   observacoes: string;
+  origem?: 'manual' | 'catalogo';
+  modalidade_pagamento?: ModalidadePagamento;
+  created_by_user_id?: string;
+  updated_by_user_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -35,10 +39,27 @@ export interface Produto {
   codigo: string;
   nome: string;
   preco: number;
+  preco_cartao?: number;
+  preco_pix?: number;
+  preco_dinheiro?: number;
+  preco_oferta?: number;
+  image_url?: string;
+  image_storage_path?: string;
   subcategoria_id?: string;
   subcategoria?: Categoria;
+  created_by_user_id?: string;
+  updated_by_user_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export type ModalidadePagamento = 'cartao' | 'pix' | 'dinheiro' | 'oferta';
+
+export interface RegraPreco {
+  nome: string;
+  descricao: string;
+  minimoValor?: number;
+  minimoQuantidade?: number;
 }
 
 export interface Categoria {
@@ -56,10 +77,43 @@ export interface Atendimento {
   descricao: string;
   status: 'Aguardando' | 'Em Atendimento' | 'Resolvido';
   prioridade: 'Alta' | 'Normal' | 'Baixa';
+  created_by_user_id?: string;
+  updated_by_user_id?: string;
   created_at: string;
   updated_at: string;
   is_read?: boolean;
   archived_at?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'atendente';
+  avatar_url?: string;
+  is_active: boolean;
+  created_by_user_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConfiguracoesSystem {
+  id: string;
+  whatsapp_loja: string;
+  catalogo_ativo: boolean;
+  regras_precos: {
+    cartao: RegraPreco;
+    pix: RegraPreco;
+    dinheiro: RegraPreco;
+    oferta: RegraPreco;
+  };
+  updated_at: string;
+  updated_by_user_id?: string;
+}
+
+export interface CarrinhoItem {
+  produto: Produto;
+  quantidade: number;
 }
 
 export type Periodo = 'hoje' | 'ontem' | '7dias' | 'semana' | 'mes' | 'personalizado';
