@@ -1,10 +1,9 @@
 import { ShoppingCart as CartIcon, X, Plus, Minus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { CarrinhoItem, ModalidadePagamento } from '../types';
 
 interface ShoppingCartProps {
   items: CarrinhoItem[];
-  modalidade: ModalidadePagamento;
-  onModalidadeChange: (modalidade: ModalidadePagamento) => void;
   onUpdateQuantity: (produtoId: string, quantidade: number) => void;
   onRemoveItem: (produtoId: string) => void;
   onCheckout: () => void;
@@ -13,13 +12,13 @@ interface ShoppingCartProps {
 
 export const ShoppingCart = ({
   items,
-  modalidade,
-  onModalidadeChange,
   onUpdateQuantity,
   onRemoveItem,
   onCheckout,
   onClose,
 }: ShoppingCartProps) => {
+  const [modalidade, setModalidade] = useState<ModalidadePagamento>('cartao');
+
   const getPreco = (item: CarrinhoItem): number => {
     const produto = item.produto;
     switch (modalidade) {
@@ -83,7 +82,7 @@ export const ShoppingCart = ({
                   {modalidades.map((mod) => (
                     <button
                       key={mod.value}
-                      onClick={() => onModalidadeChange(mod.value)}
+                      onClick={() => setModalidade(mod.value)}
                       className={`p-3 border-2 rounded-lg text-left transition-all ${
                         modalidade === mod.value
                           ? 'border-red-600 bg-red-50'

@@ -12,7 +12,6 @@ export const Catalogo = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoria, setSelectedCategoria] = useState<string>('');
-  const [modalidade, setModalidade] = useState<ModalidadePagamento>('cartao');
   const [carrinho, setCarrinho] = useState<CarrinhoItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -24,6 +23,25 @@ export const Catalogo = () => {
     fetchConfiguracoes();
     fetchCategorias();
     fetchProdutos();
+
+    const produtosSubscription = supabase
+      .channel('produtos-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'produtos'
+        },
+        () => {
+          fetchProdutos();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      produtosSubscription.unsubscribe();
+    };
   }, []);
 
   const fetchConfiguracoes = async () => {
@@ -132,39 +150,33 @@ export const Catalogo = () => {
     setCarrinho(carrinho.filter((item) => item.produto.id !== produtoId));
   };
 
-  const calcularTotal = (): number => {
-    return carrinho.reduce((total, item) => {
-      const preco = getPreco(item.produto);
-      return total + preco * item.quantidade;
-    }, 0);
-  };
-
-  const getPreco = (produto: Produto): number => {
-    switch (modalidade) {
-      case 'cartao':
-        return produto.preco_cartao || produto.preco;
-      case 'pix':
-        return produto.preco_pix || produto.preco;
-      case 'dinheiro':
-        return produto.preco_dinheiro || produto.preco;
-      case 'oferta':
-        return produto.preco_oferta || produto.preco;
-      default:
-        return produto.preco;
-    }
-  };
 
   const handleCheckout = () => {
     setShowCart(false);
     setShowCheckout(true);
   };
 
-  const handleConfirmCheckout = (dados: { nome: string; telefone: string; endereco: string }) => {
+  const handleConfirmCheckout = (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number }) => {
     const modalidadeLabel: Record<ModalidadePagamento, string> = {
       cartao: 'Cartão/Varejo',
       pix: 'PIX/TED',
       dinheiro: 'Dinheiro',
       oferta: 'Oferta',
+    };
+
+    const getPrecoItem = (produto: Produto, modalidade: ModalidadePagamento): number => {
+      switch (modalidade) {
+        case 'cartao':
+          return produto.preco_cartao || produto.preco;
+        case 'pix':
+          return produto.preco_pix || produto.preco;
+        case 'dinheiro':
+          return produto.preco_dinheiro || produto.preco;
+        case 'oferta':
+          return produto.preco_oferta || produto.preco;
+        default:
+          return produto.preco;
+      }
     };
 
     const mensagem = `*Novo Pedido - O Bom da Roça*
@@ -173,7 +185,7 @@ export const Catalogo = () => {
 *Telefone:* ${dados.telefone}
 *Endereço:* ${dados.endereco}
 
-*Modalidade:* ${modalidadeLabel[modalidade]}
+*Modalidade:* ${modalidadeLabel[dados.modalidade]}
 
 *Itens:*
 ${carrinho
@@ -181,12 +193,12 @@ ${carrinho
     (item) =>
       `• ${item.produto.nome} (${item.produto.codigo})
   Quantidade: ${item.quantidade}
-  Preço unitário: R$ ${getPreco(item.produto).toFixed(2)}
-  Subtotal: R$ ${(getPreco(item.produto) * item.quantidade).toFixed(2)}`
+  Preço unitário: R$ ${getPrecoItem(item.produto, dados.modalidade).toFixed(2)}
+  Subtotal: R$ ${(getPrecoItem(item.produto, dados.modalidade) * item.quantidade).toFixed(2)}`
   )
   .join('\n\n')}
 
-*Total: R$ ${calcularTotal().toFixed(2)}*`;
+*Total: R$ ${dados.total.toFixed(2)}*`;
 
     const whatsappUrl = `https://wa.me/${whatsappLoja}?text=${encodeURIComponent(mensagem)}`;
     window.open(whatsappUrl, '_blank');
@@ -261,48 +273,6 @@ ${carrinho
             </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setModalidade('cartao')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                modalidade === 'cartao'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              Cartão/Varejo
-            </button>
-            <button
-              onClick={() => setModalidade('pix')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                modalidade === 'pix'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              PIX/TED
-            </button>
-            <button
-              onClick={() => setModalidade('dinheiro')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                modalidade === 'dinheiro'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              Dinheiro
-            </button>
-            <button
-              onClick={() => setModalidade('oferta')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                modalidade === 'oferta'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              Oferta
-            </button>
-          </div>
         </div>
 
         {loading ? (
@@ -315,12 +285,11 @@ ${carrinho
             <p className="text-gray-500 text-lg">Nenhum produto encontrado</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {produtosFiltrados.map((produto) => (
               <ProductCard
                 key={produto.id}
                 produto={produto}
-                modalidade={modalidade}
                 onAddToCart={handleAddToCart}
               />
             ))}
@@ -331,8 +300,6 @@ ${carrinho
       {showCart && (
         <ShoppingCart
           items={carrinho}
-          modalidade={modalidade}
-          onModalidadeChange={setModalidade}
           onUpdateQuantity={handleUpdateQuantity}
           onRemoveItem={handleRemoveItem}
           onCheckout={handleCheckout}
@@ -343,8 +310,6 @@ ${carrinho
       {showCheckout && (
         <CheckoutModal
           items={carrinho}
-          modalidade={modalidade}
-          total={calcularTotal()}
           onClose={() => setShowCheckout(false)}
           onConfirm={handleConfirmCheckout}
         />

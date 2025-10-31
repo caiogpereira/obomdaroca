@@ -4,19 +4,16 @@ import { CarrinhoItem, ModalidadePagamento } from '../types';
 
 interface CheckoutModalProps {
   items: CarrinhoItem[];
-  modalidade: ModalidadePagamento;
-  total: number;
   onClose: () => void;
-  onConfirm: (dados: { nome: string; telefone: string; endereco: string }) => void;
+  onConfirm: (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number }) => void;
 }
 
 export const CheckoutModal = ({
   items,
-  modalidade,
-  total,
   onClose,
   onConfirm,
 }: CheckoutModalProps) => {
+  const [modalidade, setModalidade] = useState<ModalidadePagamento>('cartao');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -43,10 +40,34 @@ export const CheckoutModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  const getPreco = (item: CarrinhoItem): number => {
+    const produto = item.produto;
+    switch (modalidade) {
+      case 'cartao':
+        return produto.preco_cartao || produto.preco;
+      case 'pix':
+        return produto.preco_pix || produto.preco;
+      case 'dinheiro':
+        return produto.preco_dinheiro || produto.preco;
+      case 'oferta':
+        return produto.preco_oferta || produto.preco;
+      default:
+        return produto.preco;
+    }
+  };
+
+  const calcularTotal = (): number => {
+    return items.reduce((total, item) => total + getPreco(item) * item.quantidade, 0);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      onConfirm(formData);
+      onConfirm({
+        ...formData,
+        modalidade,
+        total: calcularTotal(),
+      });
     }
   };
 
@@ -72,10 +93,60 @@ export const CheckoutModal = ({
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-6">
-            <h3 className="font-medium text-gray-900 mb-3">Resumo do Pedido</h3>
+            <h3 className="font-medium text-gray-900 mb-3">Selecione a Modalidade de Pagamento</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => setModalidade('cartao')}
+                className={`p-3 border-2 rounded-lg text-left transition-all ${
+                  modalidade === 'cartao'
+                    ? 'border-red-600 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">Cartão/Varejo</div>
+                <div className="text-xs text-gray-500 mt-1">Sem quantidade mínima</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalidade('pix')}
+                className={`p-3 border-2 rounded-lg text-left transition-all ${
+                  modalidade === 'pix'
+                    ? 'border-red-600 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">PIX/TED</div>
+                <div className="text-xs text-gray-500 mt-1">Min. R$ 300 ou 10 unidades</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalidade('dinheiro')}
+                className={`p-3 border-2 rounded-lg text-left transition-all ${
+                  modalidade === 'dinheiro'
+                    ? 'border-red-600 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">Dinheiro</div>
+                <div className="text-xs text-gray-500 mt-1">Min. R$ 500 ou 15 unidades</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalidade('oferta')}
+                className={`p-3 border-2 rounded-lg text-left transition-all ${
+                  modalidade === 'oferta'
+                    ? 'border-red-600 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-gray-900">Oferta</div>
+                <div className="text-xs text-gray-500 mt-1">30 unidades (pagamento em dinheiro)</div>
+              </button>
+            </div>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Modalidade:</span>
+                <span className="text-gray-600">Modalidade selecionada:</span>
                 <span className="font-medium text-gray-900">{modalidadeLabel[modalidade]}</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -86,7 +157,7 @@ export const CheckoutModal = ({
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-200">
                 <span className="font-medium text-gray-900">Valor Total:</span>
-                <span className="text-xl font-bold text-red-600">R$ {total.toFixed(2)}</span>
+                <span className="text-xl font-bold text-red-600">R$ {calcularTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
