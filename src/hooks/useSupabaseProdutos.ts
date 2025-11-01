@@ -213,7 +213,7 @@ export const useSupabaseProdutos = () => {
                 .from('categorias')
                 .insert({ nome: p.subcategoria_id })
                 .select()
-                .single();
+                .maybeSingle();
 
               if (newCat) {
                 subcategoria_id = newCat.id;
@@ -223,9 +223,15 @@ export const useSupabaseProdutos = () => {
           }
 
           return {
-            codigo: p.codigo,
-            nome: p.nome,
+            codigo: p.codigo.trim(),
+            nome: p.nome.trim(),
             preco: p.preco,
+            preco_cartao: p.preco_cartao || null,
+            preco_pix: p.preco_pix || null,
+            preco_dinheiro: p.preco_dinheiro || null,
+            preco_oferta: p.preco_oferta || null,
+            image_url: p.image_url || null,
+            image_storage_path: p.image_storage_path || null,
             subcategoria_id,
           };
         })
@@ -233,10 +239,14 @@ export const useSupabaseProdutos = () => {
 
       const { error } = await supabase.from('produtos').insert(produtosParaInserir);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro detalhado ao importar:', error);
+        throw error;
+      }
       await fetchCategorias();
       await fetchProdutos();
     } catch (err) {
+      console.error('Erro ao importar produtos:', err);
       throw new Error(err instanceof Error ? err.message : 'Erro ao importar produtos');
     }
   };

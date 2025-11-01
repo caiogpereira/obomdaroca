@@ -122,10 +122,13 @@ export const AdminLayout = () => {
 
   const handleImportProdutos = async (produtos: any) => {
     try {
+      console.log('Iniciando importação de produtos:', produtos);
       await importProdutos(produtos);
       setToast({ message: `${produtos.length} produtos importados com sucesso!`, type: 'success' });
     } catch (error) {
-      setToast({ message: (error as Error).message, type: 'error' });
+      console.error('Erro completo ao importar produtos:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao importar produtos';
+      setToast({ message: `Erro ao importar produtos: ${errorMessage}`, type: 'error' });
     }
   };
 
