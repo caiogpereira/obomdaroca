@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Upload, Edit, Trash2, Package, FolderKanban } from 'lucide-react';
+import { Search, Plus, Upload, Edit, Trash2, Package, FolderKanban, CheckSquare, Square } from 'lucide-react';
 import { Produto, Categoria } from '../types';
 import { FileUpload } from '../components/FileUpload';
 import { ProdutoModal } from '../components/ProdutoModal';
@@ -11,6 +11,7 @@ interface ProdutosProps {
   onAddProduto: (produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>) => void;
   onUpdateProduto: (id: string, produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>) => void;
   onDeleteProduto: (id: string) => void;
+  onDeleteMultipleProdutos?: (ids: string[]) => void;
   onImportProdutos: (produtos: Omit<Produto, 'id' | 'created_at' | 'updated_at'>[]) => void;
   onAddCategoria: (nome: string) => void;
   onUpdateCategoria: (id: string, nome: string) => void;
@@ -23,6 +24,7 @@ export const Produtos = ({
   onAddProduto,
   onUpdateProduto,
   onDeleteProduto,
+  onDeleteMultipleProdutos,
   onImportProdutos,
   onAddCategoria,
   onUpdateCategoria,
@@ -34,6 +36,8 @@ export const Produtos = ({
   const [showCategoriaModal, setShowCategoriaModal] = useState(false);
   const [selectedProduto, setSelectedProduto] = useState<Produto | undefined>(undefined);
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
 
   const filteredProdutos = produtos.filter((produto) => {
     const matchesSearch =
@@ -73,6 +77,45 @@ export const Produtos = ({
     }
   };
 
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProdutos.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProdutos.map(p => p.id)));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+
+    const count = selectedIds.size;
+    if (window.confirm(`Tem certeza que deseja excluir ${count} produto(s) selecionado(s)?`)) {
+      if (onDeleteMultipleProdutos) {
+        onDeleteMultipleProdutos(Array.from(selectedIds));
+      } else {
+        // Fallback: delete one by one
+        selectedIds.forEach(id => onDeleteProduto(id));
+      }
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    }
+  };
+
+  const cancelSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
   const getCategoriaName = (id?: string) => {
     if (!id) return 'Sem categoria';
     const categoria = categorias.find((c) => c.id === id);
@@ -91,27 +134,59 @@ export const Produtos = ({
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setShowCategoriaModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
-            >
-              <FolderKanban className="w-5 h-5" />
-              Gerenciar Categorias
-            </button>
-            <button
-              onClick={() => setShowUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
-            >
-              <Upload className="w-5 h-5" />
-              Importar Planilha
-            </button>
-            <button
-              onClick={handleAdd}
-              className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
-            >
-              <Plus className="w-5 h-5" />
-              Novo Produto
-            </button>
+            {!selectionMode ? (
+              <>
+                <button
+                  onClick={() => setShowCategoriaModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                >
+                  <FolderKanban className="w-5 h-5" />
+                  Gerenciar Categorias
+                </button>
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                >
+                  <Upload className="w-5 h-5" />
+                  Importar Planilha
+                </button>
+                <button
+                  onClick={() => setSelectionMode(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                >
+                  <CheckSquare className="w-5 h-5" />
+                  Seleção Múltipla
+                </button>
+                <button
+                  onClick={handleAdd}
+                  className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
+                >
+                  <Plus className="w-5 h-5" />
+                  Novo Produto
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium border border-blue-200">
+                  <CheckSquare className="w-5 h-5" />
+                  {selectedIds.size} selecionado(s)
+                </div>
+                <button
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.size === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Excluir Selecionados
+                </button>
+                <button
+                  onClick={cancelSelection}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                >
+                  Cancelar
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -165,6 +240,21 @@ export const Produtos = ({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  {selectionMode && (
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 w-12">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        title={selectedIds.size === filteredProdutos.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                      >
+                        {selectedIds.size === filteredProdutos.length ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-gray-400" />
+                        )}
+                      </button>
+                    </th>
+                  )}
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
                     Código
                   </th>
@@ -177,17 +267,35 @@ export const Produtos = ({
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
                     Subcategoria
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                    Ações
-                  </th>
+                  {!selectionMode && (
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                      Ações
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {filteredProdutos.map((produto) => (
                   <tr
                     key={produto.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                      selectionMode && selectedIds.has(produto.id) ? 'bg-blue-50' : ''
+                    }`}
                   >
+                    {selectionMode && (
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => toggleSelection(produto.id)}
+                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          {selectedIds.has(produto.id) ? (
+                            <CheckSquare className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-gray-400" />
+                          )}
+                        </button>
+                      </td>
+                    )}
                     <td className="py-3 px-4 text-sm font-medium text-gray-900">
                       {produto.codigo}
                     </td>
@@ -198,24 +306,26 @@ export const Produtos = ({
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {getCategoriaName(produto.subcategoria_id)}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(produto)}
-                          className="p-1.5 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200 transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(produto.id)}
-                          className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {!selectionMode && (
+                      <td className="py-3 px-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(produto)}
+                            className="p-1.5 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(produto.id)}
+                            className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

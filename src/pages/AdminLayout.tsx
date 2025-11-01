@@ -47,6 +47,7 @@ export const AdminLayout = () => {
     addProduto,
     updateProduto,
     deleteProduto,
+    deleteMultipleProdutos,
     importProdutos,
     refetch: refetchProdutos,
   } = useSupabaseProdutos();
@@ -115,6 +116,15 @@ export const AdminLayout = () => {
     try {
       await deleteProduto(id);
       setToast({ message: 'Produto excluído com sucesso!', type: 'success' });
+    } catch (error) {
+      setToast({ message: (error as Error).message, type: 'error' });
+    }
+  };
+
+  const handleDeleteMultipleProdutos = async (ids: string[]) => {
+    try {
+      await deleteMultipleProdutos(ids);
+      setToast({ message: `${ids.length} produto(s) excluído(s) com sucesso!`, type: 'success' });
     } catch (error) {
       setToast({ message: (error as Error).message, type: 'error' });
     }
@@ -254,6 +264,7 @@ export const AdminLayout = () => {
             onAddProduto={handleAddProduto}
             onUpdateProduto={handleUpdateProduto}
             onDeleteProduto={handleDeleteProduto}
+            onDeleteMultipleProdutos={handleDeleteMultipleProdutos}
             onImportProdutos={handleImportProdutos}
             onAddCategoria={handleAddCategoria}
             onUpdateCategoria={handleUpdateCategoria}

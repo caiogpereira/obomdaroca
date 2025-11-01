@@ -192,6 +192,17 @@ export const useSupabaseProdutos = () => {
     }
   };
 
+  const deleteMultipleProdutos = async (ids: string[]) => {
+    try {
+      const { error } = await supabase.from('produtos').delete().in('id', ids);
+
+      if (error) throw error;
+      await fetchProdutos();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Erro ao excluir produtos');
+    }
+  };
+
   const importProdutos = async (produtos: Omit<Produto, 'id' | 'created_at' | 'updated_at'>[]) => {
     try {
       const categoriasMap = new Map<string, string>();
@@ -211,16 +222,29 @@ export const useSupabaseProdutos = () => {
         }
       }
 
-      // Create new categories
+      // Create new categories (only if they don't exist)
       for (const catName of uniqueCategories) {
-        const { data: newCat } = await supabase
+        // Check if category already exists (case-insensitive)
+        const { data: existingCat } = await supabase
           .from('categorias')
-          .insert({ nome: catName })
-          .select()
+          .select('id, nome')
+          .ilike('nome', catName)
           .maybeSingle();
 
-        if (newCat) {
-          categoriasMap.set(catName.toLowerCase(), newCat.id);
+        if (existingCat) {
+          // Category already exists, use it
+          categoriasMap.set(catName.toLowerCase(), existingCat.id);
+        } else {
+          // Create new category
+          const { data: newCat } = await supabase
+            .from('categorias')
+            .insert({ nome: catName })
+            .select()
+            .maybeSingle();
+
+          if (newCat) {
+            categoriasMap.set(catName.toLowerCase(), newCat.id);
+          }
         }
       }
 
@@ -290,6 +314,7 @@ export const useSupabaseProdutos = () => {
     addProduto,
     updateProduto,
     deleteProduto,
+    deleteMultipleProdutos,
     importProdutos,
     refetch: fetchProdutos,
   };
