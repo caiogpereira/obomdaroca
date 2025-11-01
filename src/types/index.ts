@@ -11,6 +11,7 @@ export interface Pedido {
   cliente: string;
   telefone: string;
   email: string;
+  endereco?: string;
   valor_total: number;
   status: 'Novo' | 'Em Atendimento' | 'Finalizado';
   itens: ItemPedido[];

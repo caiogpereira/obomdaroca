@@ -6,7 +6,7 @@ import { validatePricingRules, getBestAvailablePaymentMethod } from '../utils/pr
 interface CheckoutModalProps {
   items: CarrinhoItem[];
   onClose: () => void;
-  onConfirm: (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number }) => void;
+  onConfirm: (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number; observacoes?: string }) => void;
 }
 
 export const CheckoutModal = ({
@@ -22,6 +22,7 @@ export const CheckoutModal = ({
     nome: '',
     telefone: '',
     endereco: '',
+    observacoes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -89,7 +90,10 @@ export const CheckoutModal = ({
     e.preventDefault();
     if (validate()) {
       onConfirm({
-        ...formData,
+        nome: formData.nome,
+        telefone: formData.telefone,
+        endereco: formData.endereco,
+        observacoes: formData.observacoes || undefined,
         modalidade,
         total: calcularTotal(),
       });
@@ -243,6 +247,19 @@ export const CheckoutModal = ({
                 rows={3}
               />
               {errors.endereco && <p className="mt-1 text-sm text-red-600">{errors.endereco}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observações (opcional)
+              </label>
+              <textarea
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Alguma observação sobre o pedido? Ex: horário preferencial, instruções de entrega..."
+                rows={2}
+              />
             </div>
           </div>
 

@@ -6,6 +6,7 @@ import { ProductCard } from '../components/ProductCard';
 import { ShoppingCart } from '../components/ShoppingCart';
 import { CheckoutModal } from '../components/CheckoutModal';
 import { Toast } from '../components/Toast';
+import { criarPedidoCatalogo } from '../services/pedidoService';
 
 export const Catalogo = () => {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -17,6 +18,7 @@ export const Catalogo = () => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [whatsappLoja, setWhatsappLoja] = useState('553599731201');
   const [loading, setLoading] = useState(true);
+  const [salvandoPedido, setSalvandoPedido] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -156,7 +158,32 @@ export const Catalogo = () => {
     setShowCheckout(true);
   };
 
-  const handleConfirmCheckout = (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number }) => {
+  const handleConfirmCheckout = async (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number; observacoes?: string }) => {
+    setSalvandoPedido(true);
+
+    const resultado = await criarPedidoCatalogo({
+      nome: dados.nome,
+      telefone: dados.telefone,
+      endereco: dados.endereco,
+      modalidade: dados.modalidade,
+      observacoes: dados.observacoes,
+      items: carrinho,
+    });
+
+    setSalvandoPedido(false);
+
+    if (!resultado.success) {
+      setToast({
+        message: `Erro ao registrar pedido: ${resultado.error}. Você ainda pode enviar via WhatsApp.`,
+        type: 'error'
+      });
+    } else {
+      setToast({
+        message: 'Pedido Registrado com Sucesso!',
+        type: 'success'
+      });
+    }
+
     const modalidadeLabel: Record<ModalidadePagamento, string> = {
       cartao: 'Cartão/Varejo',
       pix: 'PIX/TED',
@@ -179,33 +206,26 @@ export const Catalogo = () => {
       }
     };
 
-    const mensagem = `*Novo Pedido - O Bom da Roça*
+    const numeroPedidoTexto = resultado.success && resultado.numeroPedido
+      ? `*Pedido:* ${resultado.numeroPedido}\n`
+      : '';
 
-*Cliente:* ${dados.nome}
-*Telefone:* ${dados.telefone}
-*Endereço:* ${dados.endereco}
+    const observacoesTexto = dados.observacoes
+      ? `\n*Observações:* ${dados.observacoes}\n`
+      : '';
 
-*Modalidade:* ${modalidadeLabel[dados.modalidade]}
-
-*Itens:*
-${carrinho
+    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n*Telefone:* ${dados.telefone}\n*Endereço:* ${dados.endereco}${observacoesTexto}\n*Modalidade:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
   .map(
     (item) =>
-      `• ${item.produto.nome} (${item.produto.codigo})
-  Quantidade: ${item.quantidade}
-  Preço unitário: R$ ${getPrecoItem(item.produto, dados.modalidade).toFixed(2)}
-  Subtotal: R$ ${(getPrecoItem(item.produto, dados.modalidade) * item.quantidade).toFixed(2)}`
+      `• ${item.produto.nome} (${item.produto.codigo})\n  Quantidade: ${item.quantidade}\n  Preço unitário: R$ ${getPrecoItem(item.produto, dados.modalidade).toFixed(2)}\n  Subtotal: R$ ${(getPrecoItem(item.produto, dados.modalidade) * item.quantidade).toFixed(2)}`
   )
-  .join('\n\n')}
-
-*Total: R$ ${dados.total.toFixed(2)}*`;
+  .join('\n\n')}\n\n*Total: R$ ${dados.total.toFixed(2)}*`;
 
     const whatsappUrl = `https://wa.me/${whatsappLoja}?text=${encodeURIComponent(mensagem)}`;
     window.open(whatsappUrl, '_blank');
 
     setCarrinho([]);
     setShowCheckout(false);
-    setToast({ message: 'Pedido enviado! Você será redirecionado para o WhatsApp', type: 'success' });
   };
 
   const totalItens = carrinho.reduce((sum, item) => sum + item.quantidade, 0);
@@ -307,12 +327,23 @@ ${carrinho
         />
       )}
 
-      {showCheckout && (
+      {showCheckout && !salvandoPedido && (
         <CheckoutModal
           items={carrinho}
           onClose={() => setShowCheckout(false)}
           onConfirm={handleConfirmCheckout}
         />
+      )}
+
+      {salvandoPedido && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl">
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+              <p className="text-gray-700 font-medium">Registrando pedido...</p>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && (
