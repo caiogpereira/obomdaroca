@@ -200,49 +200,75 @@ export const useSupabaseProdutos = () => {
         categoriasMap.set(cat.nome.toLowerCase(), cat.id);
       }
 
-      const produtosParaInserir = await Promise.all(
-        produtos.map(async (p) => {
-          let subcategoria_id = null;
-
-          if (p.subcategoria_id) {
-            const catName = p.subcategoria_id.toLowerCase();
-            if (categoriasMap.has(catName)) {
-              subcategoria_id = categoriasMap.get(catName)!;
-            } else {
-              const { data: newCat } = await supabase
-                .from('categorias')
-                .insert({ nome: p.subcategoria_id })
-                .select()
-                .maybeSingle();
-
-              if (newCat) {
-                subcategoria_id = newCat.id;
-                categoriasMap.set(catName, newCat.id);
-              }
-            }
+      // Process categories first (collect unique categories)
+      const uniqueCategories = new Set<string>();
+      for (const p of produtos) {
+        if (p.subcategoria_id) {
+          const catName = p.subcategoria_id.toLowerCase();
+          if (!categoriasMap.has(catName)) {
+            uniqueCategories.add(p.subcategoria_id);
           }
-
-          return {
-            codigo: p.codigo.trim(),
-            nome: p.nome.trim(),
-            preco: p.preco,
-            preco_cartao: p.preco_cartao || null,
-            preco_pix: p.preco_pix || null,
-            preco_dinheiro: p.preco_dinheiro || null,
-            preco_oferta: p.preco_oferta || null,
-            image_url: p.image_url || null,
-            image_storage_path: p.image_storage_path || null,
-            subcategoria_id,
-          };
-        })
-      );
-
-      const { error } = await supabase.from('produtos').insert(produtosParaInserir);
-
-      if (error) {
-        console.error('Erro detalhado ao importar:', error);
-        throw error;
+        }
       }
+
+      // Create new categories
+      for (const catName of uniqueCategories) {
+        const { data: newCat } = await supabase
+          .from('categorias')
+          .insert({ nome: catName })
+          .select()
+          .maybeSingle();
+
+        if (newCat) {
+          categoriasMap.set(catName.toLowerCase(), newCat.id);
+        }
+      }
+
+      // Prepare products for insertion
+      const produtosParaInserir = produtos.map((p) => {
+        let subcategoria_id = null;
+
+        if (p.subcategoria_id) {
+          const catName = p.subcategoria_id.toLowerCase();
+          subcategoria_id = categoriasMap.get(catName) || null;
+        }
+
+        return {
+          codigo: p.codigo.trim(),
+          nome: p.nome.trim(),
+          preco: p.preco,
+          preco_cartao: p.preco_cartao || null,
+          preco_pix: p.preco_pix || null,
+          preco_dinheiro: p.preco_dinheiro || null,
+          preco_oferta: p.preco_oferta || null,
+          image_url: p.image_url || null,
+          image_storage_path: p.image_storage_path || null,
+          subcategoria_id,
+        };
+      });
+
+      // Insert products in batches of 500 to avoid payload size limits
+      const BATCH_SIZE = 500;
+      const batches = [];
+
+      for (let i = 0; i < produtosParaInserir.length; i += BATCH_SIZE) {
+        batches.push(produtosParaInserir.slice(i, i + BATCH_SIZE));
+      }
+
+      console.log(`Importando ${produtosParaInserir.length} produtos em ${batches.length} lote(s)...`);
+
+      for (let i = 0; i < batches.length; i++) {
+        console.log(`Processando lote ${i + 1} de ${batches.length} (${batches[i].length} produtos)...`);
+
+        const { error } = await supabase.from('produtos').insert(batches[i]);
+
+        if (error) {
+          console.error(`Erro no lote ${i + 1}:`, error);
+          throw new Error(`Erro ao importar lote ${i + 1}: ${error.message}`);
+        }
+      }
+
+      console.log('Importação concluída com sucesso!');
       await fetchCategorias();
       await fetchProdutos();
     } catch (err) {

@@ -12,6 +12,10 @@ interface ImportedProduct {
   codigo: string;
   nome: string;
   preco: number;
+  preco_cartao?: number;
+  preco_pix?: number;
+  preco_dinheiro?: number;
+  preco_oferta?: number;
   subcategoria_id?: string;
 }
 
@@ -54,16 +58,38 @@ export const FileUpload = ({ onProductsImported, onClose }: FileUploadProps) => 
           const preco = parseFloat(row['Preço'] || row['Preco'] || row['preco'] || row['PREÇO'] || row['Valor'] || '0');
           const subcategoria = row['Subcategoria'] || row['subcategoria'] || row['SUBCATEGORIA'] || row['Categoria'] || '';
 
+          // Optional price fields
+          const precoCartao = row['Preço Cartão'] || row['Preco Cartao'] || row['preco_cartao'] || row['PREÇO CARTÃO'] || '';
+          const precoPix = row['Preço Pix'] || row['Preco Pix'] || row['preco_pix'] || row['PREÇO PIX'] || '';
+          const precoDinheiro = row['Preço Dinheiro'] || row['Preco Dinheiro'] || row['preco_dinheiro'] || row['PREÇO DINHEIRO'] || '';
+          const precoOferta = row['Preço Oferta'] || row['Preco Oferta'] || row['preco_oferta'] || row['PREÇO OFERTA'] || '';
+
           if (!codigo || !nome || isNaN(preco)) {
             throw new Error(`Linha ${index + 2}: Dados incompletos ou inválidos (código, nome e preço são obrigatórios)`);
           }
 
-          return {
+          const product: ImportedProduct = {
             codigo: String(codigo).trim(),
             nome: String(nome).trim(),
             preco,
             subcategoria_id: subcategoria ? String(subcategoria).trim() : undefined,
           };
+
+          // Add optional prices only if they exist and are valid
+          if (precoCartao && !isNaN(parseFloat(String(precoCartao)))) {
+            product.preco_cartao = parseFloat(String(precoCartao));
+          }
+          if (precoPix && !isNaN(parseFloat(String(precoPix)))) {
+            product.preco_pix = parseFloat(String(precoPix));
+          }
+          if (precoDinheiro && !isNaN(parseFloat(String(precoDinheiro)))) {
+            product.preco_dinheiro = parseFloat(String(precoDinheiro));
+          }
+          if (precoOferta && !isNaN(parseFloat(String(precoOferta)))) {
+            product.preco_oferta = parseFloat(String(precoOferta));
+          }
+
+          return product;
         });
 
         setPreview(products);
@@ -120,12 +146,20 @@ export const FileUpload = ({ onProductsImported, onClose }: FileUploadProps) => 
         Código: 'PROD001',
         Nome: 'Exemplo Produto 1',
         Preço: 25.50,
+        'Preço Cartão': 27.00,
+        'Preço Pix': 24.00,
+        'Preço Dinheiro': 23.50,
+        'Preço Oferta': 22.00,
         Subcategoria: 'Bebidas',
       },
       {
         Código: 'PROD002',
         Nome: 'Exemplo Produto 2',
         Preço: 45.00,
+        'Preço Cartão': 47.00,
+        'Preço Pix': 43.00,
+        'Preço Dinheiro': 42.50,
+        'Preço Oferta': 40.00,
         Subcategoria: 'Laticínios',
       },
     ];
