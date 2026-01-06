@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,22 +10,66 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const location = useLocation();
+  const { signIn, user, loading: authLoading } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      const from = (location.state as any)?.from?.pathname || '/admin';
+      navigate(from, { replace: true });
+    }
+  }, [user, authLoading, navigate, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate inputs
+    if (!email.trim()) {
+      setError('Por favor, informe seu email');
+      return;
+    }
+
+    if (!password) {
+      setError('Por favor, informe sua senha');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      navigate('/admin');
-    } catch (err) {
-      setError('Erro ao entrar. Tente novamente.');
+      await signIn(email.trim(), password);
+      // Navigation will happen automatically via useEffect when user state updates
+    } catch (err: any) {
       console.error('Login error:', err);
+      
+      // Handle specific Supabase errors
+      if (err.message?.includes('Invalid login credentials')) {
+        setError('Email ou senha incorretos');
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('Por favor, confirme seu email antes de fazer login');
+      } else if (err.message?.includes('Too many requests')) {
+        setError('Muitas tentativas. Aguarde alguns minutos e tente novamente');
+      } else {
+        setError('Erro ao entrar. Verifique suas credenciais e tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">

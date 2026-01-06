@@ -6,7 +6,7 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'atendente';
+  role: 'admin' | 'employee';
   avatar_url?: string;
   is_active: boolean;
 }

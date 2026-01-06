@@ -271,8 +271,9 @@ export const useSupabaseProdutos = () => {
         };
       });
 
-      // Insert products in batches of 500 to avoid payload size limits
-      const BATCH_SIZE = 500;
+      // Use upsert to handle duplicates gracefully
+      // Insert products in smaller batches for reliability
+      const BATCH_SIZE = 100;
       const batches = [];
 
       for (let i = 0; i < produtosParaInserir.length; i += BATCH_SIZE) {
@@ -281,20 +282,48 @@ export const useSupabaseProdutos = () => {
 
       console.log(`Importando ${produtosParaInserir.length} produtos em ${batches.length} lote(s)...`);
 
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
       for (let i = 0; i < batches.length; i++) {
         console.log(`Processando lote ${i + 1} de ${batches.length} (${batches[i].length} produtos)...`);
 
-        const { error } = await supabase.from('produtos').insert(batches[i]);
+        // Use upsert with onConflict to update existing products
+        const { data, error } = await supabase
+          .from('produtos')
+          .upsert(batches[i], {
+            onConflict: 'codigo',
+            ignoreDuplicates: false, // Update existing records
+          })
+          .select('id');
 
         if (error) {
           console.error(`Erro no lote ${i + 1}:`, error);
-          throw new Error(`Erro ao importar lote ${i + 1}: ${error.message}`);
+          errorCount += batches[i].length;
+          errors.push(`Lote ${i + 1}: ${error.message}`);
+        } else {
+          successCount += data?.length || batches[i].length;
+        }
+
+        // Small delay between batches to avoid rate limiting
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
 
-      console.log('Importação concluída com sucesso!');
+      console.log(`Importação concluída: ${successCount} sucesso, ${errorCount} erros`);
+      
+      if (errors.length > 0) {
+        console.warn('Erros durante importação:', errors);
+      }
+
       await fetchCategorias();
       await fetchProdutos();
+
+      if (errorCount > 0 && successCount === 0) {
+        throw new Error(`Falha ao importar produtos: ${errors.join('; ')}`);
+      }
     } catch (err) {
       console.error('Erro ao importar produtos:', err);
       throw new Error(err instanceof Error ? err.message : 'Erro ao importar produtos');
