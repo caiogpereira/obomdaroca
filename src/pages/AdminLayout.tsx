@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { TabNavigation } from '../components/TabNavigation';
 import { Toast } from '../components/Toast';
@@ -17,6 +17,10 @@ export const AdminLayout = () => {
   const [activeTab, setActiveTab] = useState<TabType>('atendimentos');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { showNotification } = useNotifications();
+// Define o título da página
+  useEffect(() => {
+    document.title = 'Dashboard - O Bom da Roça';
+  }, []);
 
   const handleNewAtendimento = useCallback((atendimento: any) => {
     showNotification('Novo Atendimento Recebido!', {

@@ -12,6 +12,10 @@ export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, user, loading: authLoading } = useAuth();
+// Define o título da página
+  useEffect(() => {
+    document.title = 'Login - O Bom da Roça';
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {

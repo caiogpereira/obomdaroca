@@ -20,7 +20,10 @@ export const Catalogo = () => {
   const [loading, setLoading] = useState(true);
   const [salvandoPedido, setSalvandoPedido] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
+// Define o título da página
+  useEffect(() => {
+    document.title = 'Catálogo Virtual - O Bom da Roça';
+  }, []);
   useEffect(() => {
     fetchConfiguracoes();
     fetchCategorias();
