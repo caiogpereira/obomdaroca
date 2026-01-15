@@ -7,6 +7,7 @@ import { ShoppingCart } from '../components/ShoppingCart';
 import { CheckoutModal } from '../components/CheckoutModal';
 import { Toast } from '../components/Toast';
 import { criarPedidoCatalogo } from '../services/pedidoService';
+import { Link } from 'react-router-dom';
 
 export const Catalogo = () => {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -123,21 +124,21 @@ export const Catalogo = () => {
     return matchSearch && matchCategoria;
   });
 
-  const handleAddToCart = (produto: Produto) => {
-    const existingItem = carrinho.find((item) => item.produto.id === produto.id);
-    if (existingItem) {
-      setCarrinho(
-        carrinho.map((item) =>
-          item.produto.id === produto.id
-            ? { ...item, quantidade: item.quantidade + 1 }
-            : item
-        )
-      );
-    } else {
-      setCarrinho([...carrinho, { produto, quantidade: 1 }]);
-    }
-    setToast({ message: `${produto.nome} adicionado ao carrinho`, type: 'success' });
-  };
+const handleAddToCart = (produto: Produto, quantity: number = 1) => {
+  const existingItem = carrinho.find((item) => item.produto.id === produto.id);
+  if (existingItem) {
+    setCarrinho(
+      carrinho.map((item) =>
+        item.produto.id === produto.id
+          ? { ...item, quantidade: item.quantidade + quantity }
+          : item
+      )
+    );
+  } else {
+    setCarrinho([...carrinho, { produto, quantidade: quantity }]);
+  }
+  setToast({ message: `${produto.nome} adicionado ao carrinho`, type: 'success' });
+};
 
   const handleUpdateQuantity = (produtoId: string, quantidade: number) => {
     if (quantidade <= 0) {
@@ -245,9 +246,17 @@ export const Catalogo = () => {
                 className="w-12 h-12 object-contain"
               />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">O Bom da Roça</h1>
-                <p className="text-xs text-gray-500">Catálogo de Produtos</p>
-              </div>
+              <h1 className="text-xl font-bold text-gray-900">O Bom da Roça</h1>
+              <p className="text-sm text-gray-500">Catálogo de Produtos</p>
+            </div>
+            
+            {/* Link para área administrativa */}
+            <Link
+              to="/login"
+              className="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
+            >
+              Área Administrativa
+            </Link>
             </div>
             <button
               onClick={() => setShowCart(true)}

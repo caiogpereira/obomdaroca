@@ -165,14 +165,32 @@ export const ShoppingCart = ({
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                      <div className="flex items-center gap-2 border border-gray-300 rounded-lg">
+                      <div className="flex items-center gap-1 border border-gray-300 rounded-lg">
                         <button
                           onClick={() => onUpdateQuantity(item.produto.id, item.quantidade - 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
-                        <span className="w-12 text-center font-medium">{item.quantidade}</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={item.quantidade}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              onUpdateQuantity(item.produto.id, 1);
+                            } else {
+                              const num = parseInt(val);
+                              if (!isNaN(num) && num >= 0 && num <= 999) {
+                                onUpdateQuantity(item.produto.id, num);
+                              }
+                            }
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          className="w-12 text-center font-medium border-0 focus:outline-none focus:ring-0"
+                        />
                         <button
                           onClick={() => onUpdateQuantity(item.produto.id, item.quantidade + 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"

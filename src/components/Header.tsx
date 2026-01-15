@@ -3,6 +3,8 @@ import { Menu, LogOut, Settings, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { UserManagementModal } from './UserManagementModal';
+import { Link } from 'react-router-dom';
+import { ShoppingBag } from 'lucide-react';
 
 export const Header = () => {
   const { profile, signOut, isAdmin } = useAuth();
@@ -62,6 +64,17 @@ export const Header = () => {
                     <p className="text-sm font-medium text-gray-900">{profile?.full_name}</p>
                     <p className="text-xs text-gray-500">{profile?.email}</p>
                   </div>
+
+{/* Link para o Catálogo */}
+                  <Link
+                    to="/catalogo"
+                    target="_blank"
+                    onClick={() => setShowUserMenu(false)}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    Ver Catálogo
+                  </Link>
 
                   {/* Gerenciar Usuários - Só para Admin */}
                   {isAdmin && (
