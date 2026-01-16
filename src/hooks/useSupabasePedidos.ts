@@ -53,6 +53,7 @@ export const useSupabasePedidos = () => {
             observacoes: pedido.observacoes || '',
             origem: pedido.origem,
             modalidade_pagamento: pedido.modalidade_pagamento,
+            forma_pagamento: pedido.forma_pagamento || '',
             created_at: pedido.created_at,
             updated_at: pedido.updated_at,
             itens: (itensData || []).map((item) => ({

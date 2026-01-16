@@ -34,11 +34,11 @@ export const ProductCard = ({ produto, onAddToCart }: ProductCardProps) => {
 
   const handleAddToCart = () => {
     // Verifica se o produto tem pelo menos um preço válido
-    const temPrecoValido = produto.preco > 0 || 
+    const precoVarejo = produto.preco_varejo || produto.preco || 0;
+    const temPrecoValido = precoVarejo > 0 || 
       (produto.preco_cartao && produto.preco_cartao > 0) ||
       (produto.preco_pix && produto.preco_pix > 0) ||
-      (produto.preco_dinheiro && produto.preco_dinheiro > 0) ||
-      (produto.preco_oferta && produto.preco_oferta > 0);
+      (produto.preco_dinheiro && produto.preco_dinheiro > 0);
     
     if (!temPrecoValido) {
       alert('Este produto não possui preço cadastrado.');
@@ -50,9 +50,18 @@ export const ProductCard = ({ produto, onAddToCart }: ProductCardProps) => {
   };
 
   const formatPrice = (price: number | null | undefined) => {
-    if (price === null || price === undefined) return '-';
+    if (price === null || price === undefined || price === 0) return '-';
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
+
+  // Preço de varejo (sempre mostrado como referência)
+  const precoVarejo = produto.preco_varejo || produto.preco || 0;
+  
+  // Verifica se tem preço válido
+  const temPrecoValido = precoVarejo > 0 || 
+    (produto.preco_cartao && produto.preco_cartao > 0) ||
+    (produto.preco_pix && produto.preco_pix > 0) ||
+    (produto.preco_dinheiro && produto.preco_dinheiro > 0);
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col">
@@ -80,27 +89,32 @@ export const ProductCard = ({ produto, onAddToCart }: ProductCardProps) => {
         <span className="text-xs text-gray-400 mb-1">{produto.codigo}</span>
         
         {/* Nome */}
-        <h3 className="font-semibold text-gray-800 text-sm mb-3 line-clamp-2 min-h-[2.5rem]">
+        <h3 className="font-semibold text-gray-800 text-sm mb-2 line-clamp-2 min-h-[2.5rem]">
           {produto.nome}
         </h3>
 
+        {/* Marca (se houver) */}
+        {produto.marca && (
+          <span className="text-xs text-gray-500 mb-2">Marca: {produto.marca}</span>
+        )}
+
         {/* Preços */}
         <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+          <div className="text-center">
+            <span className="block text-gray-500">VAREJO</span>
+            <span className="font-semibold text-gray-700">{formatPrice(precoVarejo)}</span>
+          </div>
           <div className="text-center">
             <span className="block text-gray-500">CARTÃO</span>
             <span className="font-semibold text-gray-700">{formatPrice(produto.preco_cartao)}</span>
           </div>
           <div className="text-center">
-            <span className="block text-gray-500">PIX/TED</span>
+            <span className="block text-gray-500">PIX</span>
             <span className="font-semibold text-gray-700">{formatPrice(produto.preco_pix)}</span>
           </div>
           <div className="text-center">
-            <span className="block text-gray-500">DINHEIRO</span>
+            <span className="block text-gray-500">TED/DINH.</span>
             <span className="font-semibold text-gray-700">{formatPrice(produto.preco_dinheiro)}</span>
-          </div>
-          <div className="text-center">
-            <span className="block text-yellow-600 font-medium">OFERTA</span>
-            <span className="font-semibold text-yellow-600">{formatPrice(produto.preco_oferta)}</span>
           </div>
         </div>
 
@@ -132,31 +146,23 @@ export const ProductCard = ({ produto, onAddToCart }: ProductCardProps) => {
         </div>
 
         {/* Botão Adicionar */}
-        {(() => {
-          const temPrecoValido = produto.preco > 0 || 
-            (produto.preco_cartao && produto.preco_cartao > 0) ||
-            (produto.preco_pix && produto.preco_pix > 0) ||
-            (produto.preco_dinheiro && produto.preco_dinheiro > 0) ||
-            (produto.preco_oferta && produto.preco_oferta > 0);
-          
-          return temPrecoValido ? (
-            <button
-              onClick={handleAddToCart}
-              className="mt-auto w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              Adicionar
-            </button>
-          ) : (
-            <button
-              disabled
-              className="mt-auto w-full bg-gray-300 text-gray-500 py-2 px-4 rounded-lg flex items-center justify-center gap-2 cursor-not-allowed font-medium"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              Sem preço
-            </button>
-          );
-        })()}
+        {temPrecoValido ? (
+          <button
+            onClick={handleAddToCart}
+            className="mt-auto w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Adicionar
+          </button>
+        ) : (
+          <button
+            disabled
+            className="mt-auto w-full bg-gray-300 text-gray-500 py-2 px-4 rounded-lg flex items-center justify-center gap-2 cursor-not-allowed font-medium"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Sem preço
+          </button>
+        )}
       </div>
     </div>
   );

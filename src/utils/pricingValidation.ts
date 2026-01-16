@@ -1,151 +1,153 @@
 import { CarrinhoItem, ModalidadePagamento } from '../types';
 
-export interface PricingValidationResult {
+interface ValidationResult {
   isValid: boolean;
   reason?: string;
   suggestion?: string;
 }
 
-export interface PaymentMethodAvailability {
-  cartao: PricingValidationResult;
-  pix: PricingValidationResult;
-  dinheiro: PricingValidationResult;
-  oferta: PricingValidationResult;
+interface PricingAvailability {
+  varejo: ValidationResult;
+  cartao: ValidationResult;
+  pix: ValidationResult;
+  dinheiro: ValidationResult;
 }
 
-export const validatePricingRules = (
-  items: CarrinhoItem[]
-): PaymentMethodAvailability => {
-  const cartTotal = calculateCartTotal(items);
-  const productQuantities = getProductQuantities(items);
-  const maxQuantitySameProduct = Math.max(...Object.values(productQuantities), 0);
+// Constantes das regras de negócio
+const VALOR_MINIMO_ATACADO = 300; // R$ 300,00
+const QTD_MINIMA_CARTAO = 10;     // 10 unidades
+const QTD_MINIMA_PIX = 15;        // 15 unidades
+const QTD_MINIMA_DINHEIRO = 15;   // 15 unidades
 
-  const cartaoValidation: PricingValidationResult = {
-    isValid: true,
-  };
+/**
+ * Agrupa itens por marca (se houver) ou por produto individual
+ * Retorna a maior quantidade agrupada
+ */
+const getMaiorQuantidadePorMarca = (items: CarrinhoItem[]): number => {
+  const grupoPorMarca: { [key: string]: number } = {};
+  const grupoSemMarca: { [key: string]: number } = {};
 
-  const pixValidation = validatePixPricing(cartTotal, maxQuantitySameProduct);
-  const dinheiroValidation = validateDinheiroPricing(cartTotal, maxQuantitySameProduct);
-  const ofertaValidation = validateOfertaPricing(maxQuantitySameProduct);
+  items.forEach(item => {
+    const marca = item.produto.marca?.trim();
+    
+    if (marca) {
+      // Se tem marca, agrupa por marca
+      grupoPorMarca[marca] = (grupoPorMarca[marca] || 0) + item.quantidade;
+    } else {
+      // Se não tem marca, agrupa por produto individual
+      grupoSemMarca[item.produto.id] = (grupoSemMarca[item.produto.id] || 0) + item.quantidade;
+    }
+  });
 
-  return {
-    cartao: cartaoValidation,
-    pix: pixValidation,
-    dinheiro: dinheiroValidation,
-    oferta: ofertaValidation,
-  };
+  // Pega a maior quantidade entre todos os grupos
+  const maxMarca = Object.values(grupoPorMarca).length > 0 
+    ? Math.max(...Object.values(grupoPorMarca)) 
+    : 0;
+  const maxProduto = Object.values(grupoSemMarca).length > 0 
+    ? Math.max(...Object.values(grupoSemMarca)) 
+    : 0;
+
+  return Math.max(maxMarca, maxProduto);
 };
 
-const calculateCartTotal = (items: CarrinhoItem[]): number => {
+/**
+ * Calcula o total do carrinho usando preço de varejo
+ */
+const calcularTotalVarejo = (items: CarrinhoItem[]): number => {
   return items.reduce((total, item) => {
-    const preco = item.produto.preco_cartao || item.produto.preco;
-    return total + preco * item.quantidade;
+    const preco = item.produto.preco_varejo || item.produto.preco || 0;
+    return total + (preco * item.quantidade);
   }, 0);
 };
 
-const getProductQuantities = (items: CarrinhoItem[]): Record<string, number> => {
-  const quantities: Record<string, number> = {};
-  items.forEach((item) => {
-    quantities[item.produto.id] = item.quantidade;
-  });
-  return quantities;
-};
-
-const validatePixPricing = (
-  cartTotal: number,
-  maxQuantitySameProduct: number
-): PricingValidationResult => {
-  const MIN_VALUE = 300;
-  const MIN_QUANTITY = 10;
-
-  const meetsValueRequirement = cartTotal >= MIN_VALUE;
-  const meetsQuantityRequirement = maxQuantitySameProduct >= MIN_QUANTITY;
-
-  if (meetsValueRequirement || meetsQuantityRequirement) {
-    return { isValid: true };
-  }
-
-  const valueNeeded = MIN_VALUE - cartTotal;
-  const quantityNeeded = MIN_QUANTITY - maxQuantitySameProduct;
-
-  if (valueNeeded < cartTotal * 0.5) {
+/**
+ * Valida as regras de precificação para cada modalidade
+ */
+export const validatePricingRules = (items: CarrinhoItem[]): PricingAvailability => {
+  if (items.length === 0) {
     return {
-      isValid: false,
-      reason: `Necessário compra mínima de R$ ${MIN_VALUE.toFixed(2)}`,
-      suggestion: `Adicione R$ ${valueNeeded.toFixed(2)} ao carrinho`,
+      varejo: { isValid: true },
+      cartao: { isValid: false, reason: 'Carrinho vazio' },
+      pix: { isValid: false, reason: 'Carrinho vazio' },
+      dinheiro: { isValid: false, reason: 'Carrinho vazio' },
     };
   }
 
-  return {
-    isValid: false,
-    reason: `Necessário ${MIN_QUANTITY} unidades do mesmo produto ou R$ ${MIN_VALUE.toFixed(2)}`,
-    suggestion: `Adicione ${quantityNeeded} unidades ou R$ ${valueNeeded.toFixed(2)}`,
+  const totalVarejo = calcularTotalVarejo(items);
+  const maiorQtdAgrupada = getMaiorQuantidadePorMarca(items);
+
+  // VAREJO: Sempre disponível
+  const varejo: ValidationResult = { isValid: true };
+
+  // CARTÃO: >= R$300 OU >= 10 unidades (mesmo produto ou marca)
+  const cartaoValorOk = totalVarejo >= VALOR_MINIMO_ATACADO;
+  const cartaoQtdOk = maiorQtdAgrupada >= QTD_MINIMA_CARTAO;
+  const cartao: ValidationResult = {
+    isValid: cartaoValorOk || cartaoQtdOk,
+    reason: !cartaoValorOk && !cartaoQtdOk 
+      ? `Necessário ${QTD_MINIMA_CARTAO} unidades do mesmo produto/marca ou R$ ${VALOR_MINIMO_ATACADO.toFixed(2)}`
+      : undefined,
+    suggestion: !cartaoValorOk && !cartaoQtdOk
+      ? `Adicione ${QTD_MINIMA_CARTAO - maiorQtdAgrupada} unidades ou R$ ${(VALOR_MINIMO_ATACADO - totalVarejo).toFixed(2)}`
+      : undefined,
   };
+
+  // PIX: >= R$300 OU >= 15 unidades (mesmo produto ou marca)
+  const pixValorOk = totalVarejo >= VALOR_MINIMO_ATACADO;
+  const pixQtdOk = maiorQtdAgrupada >= QTD_MINIMA_PIX;
+  const pix: ValidationResult = {
+    isValid: pixValorOk || pixQtdOk,
+    reason: !pixValorOk && !pixQtdOk
+      ? `Necessário ${QTD_MINIMA_PIX} unidades do mesmo produto/marca ou R$ ${VALOR_MINIMO_ATACADO.toFixed(2)}`
+      : undefined,
+    suggestion: !pixValorOk && !pixQtdOk
+      ? `Adicione ${QTD_MINIMA_PIX - maiorQtdAgrupada} unidades ou R$ ${(VALOR_MINIMO_ATACADO - totalVarejo).toFixed(2)}`
+      : undefined,
+  };
+
+  // TED/DINHEIRO: >= R$300 OU >= 15 unidades (mesmo produto ou marca)
+  const dinheiroValorOk = totalVarejo >= VALOR_MINIMO_ATACADO;
+  const dinheiroQtdOk = maiorQtdAgrupada >= QTD_MINIMA_DINHEIRO;
+  const dinheiro: ValidationResult = {
+    isValid: dinheiroValorOk || dinheiroQtdOk,
+    reason: !dinheiroValorOk && !dinheiroQtdOk
+      ? `Necessário ${QTD_MINIMA_DINHEIRO} unidades do mesmo produto/marca ou R$ ${VALOR_MINIMO_ATACADO.toFixed(2)}`
+      : undefined,
+    suggestion: !dinheiroValorOk && !dinheiroQtdOk
+      ? `Adicione ${QTD_MINIMA_DINHEIRO - maiorQtdAgrupada} unidades ou R$ ${(VALOR_MINIMO_ATACADO - totalVarejo).toFixed(2)}`
+      : undefined,
+  };
+
+  return { varejo, cartao, pix, dinheiro };
 };
 
-const validateDinheiroPricing = (
-  cartTotal: number,
-  maxQuantitySameProduct: number
-): PricingValidationResult => {
-  const MIN_VALUE = 500;
-  const MIN_QUANTITY = 15;
-
-  const meetsValueRequirement = cartTotal >= MIN_VALUE;
-  const meetsQuantityRequirement = maxQuantitySameProduct >= MIN_QUANTITY;
-
-  if (meetsValueRequirement || meetsQuantityRequirement) {
-    return { isValid: true };
-  }
-
-  const valueNeeded = MIN_VALUE - cartTotal;
-  const quantityNeeded = MIN_QUANTITY - maxQuantitySameProduct;
-
-  if (valueNeeded < cartTotal * 0.5) {
-    return {
-      isValid: false,
-      reason: `Necessário compra mínima de R$ ${MIN_VALUE.toFixed(2)}`,
-      suggestion: `Adicione R$ ${valueNeeded.toFixed(2)} ao carrinho`,
-    };
-  }
-
-  return {
-    isValid: false,
-    reason: `Necessário ${MIN_QUANTITY} unidades do mesmo produto ou R$ ${MIN_VALUE.toFixed(2)}`,
-    suggestion: `Adicione ${quantityNeeded} unidades ou R$ ${valueNeeded.toFixed(2)}`,
-  };
-};
-
-const validateOfertaPricing = (
-  maxQuantitySameProduct: number
-): PricingValidationResult => {
-  const MIN_QUANTITY = 30;
-
-  if (maxQuantitySameProduct >= MIN_QUANTITY) {
-    return { isValid: true };
-  }
-
-  const quantityNeeded = MIN_QUANTITY - maxQuantitySameProduct;
-
-  return {
-    isValid: false,
-    reason: `Necessário ${MIN_QUANTITY} unidades do mesmo produto`,
-    suggestion: `Adicione ${quantityNeeded} unidades ao produto com mais quantidade`,
-  };
-};
-
-export const getBestAvailablePaymentMethod = (
-  availability: PaymentMethodAvailability
-): ModalidadePagamento => {
-  if (availability.oferta.isValid) return 'oferta';
+/**
+ * Retorna a melhor modalidade disponível (menor preço)
+ */
+export const getBestAvailablePaymentMethod = (availability: PricingAvailability): ModalidadePagamento => {
+  // Prioridade: dinheiro > pix > cartao > varejo (do mais barato ao mais caro)
   if (availability.dinheiro.isValid) return 'dinheiro';
   if (availability.pix.isValid) return 'pix';
-  return 'cartao';
+  if (availability.cartao.isValid) return 'cartao';
+  return 'varejo';
 };
 
-export const getProductWithMostQuantity = (items: CarrinhoItem[]): CarrinhoItem | null => {
-  if (items.length === 0) return null;
-
-  return items.reduce((max, item) =>
-    item.quantidade > max.quantidade ? item : max
-  );
+/**
+ * Obtém o preço do produto para a modalidade selecionada
+ */
+export const getPrecoByModalidade = (produto: any, modalidade: ModalidadePagamento): number => {
+  const precoVarejo = produto.preco_varejo || produto.preco || 0;
+  
+  switch (modalidade) {
+    case 'varejo':
+      return precoVarejo;
+    case 'cartao':
+      return produto.preco_cartao || precoVarejo;
+    case 'pix':
+      return produto.preco_pix || precoVarejo;
+    case 'dinheiro':
+      return produto.preco_dinheiro || precoVarejo;
+    default:
+      return precoVarejo;
+  }
 };

@@ -262,7 +262,10 @@ export const Produtos = ({
                     Nome do Produto
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                    Preço
+                    Preço Varejo
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
+                    Marca
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
                     Subcategoria
@@ -301,7 +304,10 @@ export const Produtos = ({
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">{produto.nome}</td>
                     <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                      R$ {produto.preco.toFixed(2)}
+                      R$ {(produto.preco_varejo || produto.preco || 0).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {produto.marca || '-'}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {getCategoriaName(produto.subcategoria_id)}

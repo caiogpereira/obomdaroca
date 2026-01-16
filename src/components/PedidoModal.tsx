@@ -119,7 +119,7 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
         <div className="p-6 space-y-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Dados do Cliente</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input
@@ -142,9 +142,18 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
-                  value={editedPedido.email}
+                  value={editedPedido.email || ''}
                   disabled
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                <input
+                  type="text"
+                  value={editedPedido.forma_pagamento || '-'}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-medium"
                 />
               </div>
             </div>

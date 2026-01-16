@@ -15,21 +15,27 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     codigo: produto?.codigo || '',
     nome: produto?.nome || '',
     preco: produto?.preco || 0,
+    preco_varejo: produto?.preco_varejo || produto?.preco || 0,
     preco_cartao: produto?.preco_cartao || undefined,
     preco_pix: produto?.preco_pix || undefined,
     preco_dinheiro: produto?.preco_dinheiro || undefined,
-    preco_oferta: produto?.preco_oferta || undefined,
+    categoria: produto?.categoria || '',
     subcategoria_id: produto?.subcategoria_id || '',
-    image_url: produto?.image_url || '',
+    marca: produto?.marca || '',
+    imagem_url: produto?.imagem_url || '',
     image_storage_path: produto?.image_storage_path || '',
   });
-  const [precoDisplay, setPrecoDisplay] = useState(produto?.preco ? produto.preco.toFixed(2) : '');
+
+  const [precoVarejoDisplay, setPrecoVarejoDisplay] = useState(
+    produto?.preco_varejo ? produto.preco_varejo.toFixed(2) : 
+    produto?.preco ? produto.preco.toFixed(2) : ''
+  );
   const [precoCartaoDisplay, setPrecoCartaoDisplay] = useState(produto?.preco_cartao ? produto.preco_cartao.toFixed(2) : '');
   const [precoPixDisplay, setPrecoPixDisplay] = useState(produto?.preco_pix ? produto.preco_pix.toFixed(2) : '');
   const [precoDinheiroDisplay, setPrecoDinheiroDisplay] = useState(produto?.preco_dinheiro ? produto.preco_dinheiro.toFixed(2) : '');
-  const [precoOfertaDisplay, setPrecoOfertaDisplay] = useState(produto?.preco_oferta ? produto.preco_oferta.toFixed(2) : '');
+  
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(produto?.image_url || '');
+  const [imagePreview, setImagePreview] = useState<string>(produto?.imagem_url || '');
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [inputMode, setInputMode] = useState<'select' | 'manual'>(
@@ -48,8 +54,8 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     if (!formData.nome.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     }
-    if (formData.preco <= 0) {
-      newErrors.preco = 'Preço deve ser maior que zero';
+    if (formData.preco_varejo <= 0) {
+      newErrors.preco_varejo = 'Preço Varejo deve ser maior que zero';
     }
 
     setErrors(newErrors);
@@ -61,11 +67,14 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     if (validate()) {
       try {
         setUploadingImage(true);
-        let finalFormData = { ...formData };
+        let finalFormData = { 
+          ...formData,
+          preco: formData.preco_varejo // Mantém compatibilidade com campo antigo
+        };
 
         if (imageFile && produto?.id) {
           const { url, path } = await uploadProductImage(imageFile, produto.id);
-          finalFormData.image_url = url;
+          finalFormData.imagem_url = url;
           finalFormData.image_storage_path = path;
 
           if (produto.image_storage_path) {
@@ -107,7 +116,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview('');
-    setFormData({ ...formData, image_url: '', image_storage_path: '' });
+    setFormData({ ...formData, imagem_url: '', image_storage_path: '' });
   };
 
   const filteredCategories = categorias.filter((cat) =>
@@ -141,6 +150,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
+            {/* Código */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Código do Produto *
@@ -159,6 +169,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               )}
             </div>
 
+            {/* Nome */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nome do Produto *
@@ -177,42 +188,62 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               )}
             </div>
 
+            {/* Marca */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Preço Base (R$) *
+                Marca
+              </label>
+              <input
+                type="text"
+                value={formData.marca}
+                onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Ex: Fazenda São João"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Usada para agrupar produtos no desconto por quantidade
+              </p>
+            </div>
+
+            {/* Preço Varejo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Preço Varejo (R$) *
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
                 <input
                   type="text"
-                  value={precoDisplay}
+                  value={precoVarejoDisplay}
                   onChange={(e) => {
                     const value = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
-                    setPrecoDisplay(value);
+                    setPrecoVarejoDisplay(value);
                     const numValue = parseFloat(value) || 0;
-                    setFormData({ ...formData, preco: numValue });
+                    setFormData({ ...formData, preco_varejo: numValue, preco: numValue });
                   }}
                   onFocus={() => {
-                    if (precoDisplay === '' || parseFloat(precoDisplay) === 0) {
-                      setPrecoDisplay('');
+                    if (precoVarejoDisplay === '' || parseFloat(precoVarejoDisplay) === 0) {
+                      setPrecoVarejoDisplay('');
                     }
                   }}
                   onBlur={() => {
-                    const numValue = parseFloat(precoDisplay) || 0;
-                    setPrecoDisplay(numValue > 0 ? numValue.toFixed(2) : '');
+                    const numValue = parseFloat(precoVarejoDisplay) || 0;
+                    setPrecoVarejoDisplay(numValue > 0 ? numValue.toFixed(2) : '');
                   }}
                   className={`w-full pl-12 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                    errors.preco ? 'border-red-500' : 'border-gray-300'
+                    errors.preco_varejo ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="0.00"
                 />
               </div>
-              {errors.preco && (
-                <p className="mt-1 text-sm text-red-600">{errors.preco}</p>
+              <p className="mt-1 text-xs text-gray-500">Preço padrão, sem quantidade mínima</p>
+              {errors.preco_varejo && (
+                <p className="mt-1 text-sm text-red-600">{errors.preco_varejo}</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Preços Atacado */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Preço Cartão (R$)
@@ -236,7 +267,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     placeholder="0.00"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Sem quantidade mínima</p>
+                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 10un</p>
               </div>
 
               <div>
@@ -262,12 +293,12 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     placeholder="0.00"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Min. R$ 300 ou 10 unidades</p>
+                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 15un</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço Dinheiro (R$)
+                  Preço TED/Dinheiro (R$)
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
@@ -288,36 +319,25 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     placeholder="0.00"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Min. R$ 500 ou 15 unidades</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço Oferta (R$)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
-                  <input
-                    type="text"
-                    value={precoOfertaDisplay}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
-                      setPrecoOfertaDisplay(value);
-                      const numValue = parseFloat(value) || undefined;
-                      setFormData({ ...formData, preco_oferta: numValue });
-                    }}
-                    onBlur={() => {
-                      const numValue = parseFloat(precoOfertaDisplay) || 0;
-                      setPrecoOfertaDisplay(numValue > 0 ? numValue.toFixed(2) : '');
-                    }}
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="0.00"
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">30 unidades (pagamento em dinheiro)</p>
+                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 15un</p>
               </div>
             </div>
 
+            {/* Categoria */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Categoria
+              </label>
+              <input
+                type="text"
+                value={formData.categoria}
+                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Ex: Laticínios"
+              />
+            </div>
+
+            {/* Subcategoria */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Subcategoria
@@ -344,7 +364,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
-                  Criar Categoria
+                  Criar Subcategoria
                 </button>
               </div>
 
@@ -354,7 +374,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                   onChange={(e) => setFormData({ ...formData, subcategoria_id: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
-                  <option value="">Selecione uma categoria</option>
+                  <option value="">Selecione uma subcategoria</option>
                   {categorias.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.nome}
@@ -369,7 +389,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     onChange={(e) => handleManualCategoryChange(e.target.value)}
                     onFocus={() => setShowSuggestions(manualCategory.length > 0)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Digite o nome da categoria"
+                    placeholder="Digite o nome da subcategoria"
                   />
                   {showSuggestions && filteredCategories.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -386,12 +406,13 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     </div>
                   )}
                   <p className="mt-1 text-xs text-gray-500">
-                    Se a categoria não existir, será criada automaticamente
+                    Se não existir, será criada automaticamente
                   </p>
                 </div>
               )}
             </div>
 
+            {/* Imagem */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Imagem do Produto
@@ -429,9 +450,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               {errors.image && (
                 <p className="mt-1 text-sm text-red-600">{errors.image}</p>
               )}
-              <p className="mt-2 text-xs text-gray-500">
-                A imagem será comprimida automaticamente para até 500KB
-              </p>
             </div>
           </div>
 

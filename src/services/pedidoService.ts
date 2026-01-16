@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { CarrinhoItem, ModalidadePagamento } from '../types';
+import { getPrecoByModalidade } from '../utils/pricingValidation';
 
 export interface DadosPedidoCatalogo {
   nome: string;
@@ -42,23 +43,14 @@ const gerarNumeroPedido = async (): Promise<string> => {
   }
 };
 
-const calcularPrecoItem = (
-  item: CarrinhoItem,
-  modalidade: ModalidadePagamento
-): number => {
-  const produto = item.produto;
-  switch (modalidade) {
-    case 'cartao':
-      return produto.preco_cartao || produto.preco;
-    case 'pix':
-      return produto.preco_pix || produto.preco;
-    case 'dinheiro':
-      return produto.preco_dinheiro || produto.preco;
-    case 'oferta':
-      return produto.preco_oferta || produto.preco;
-    default:
-      return produto.preco;
-  }
+const getModalidadeLabel = (modalidade: ModalidadePagamento): string => {
+  const labels: Record<ModalidadePagamento, string> = {
+    varejo: 'Varejo',
+    cartao: 'Cartão',
+    pix: 'PIX',
+    dinheiro: 'TED/Dinheiro',
+  };
+  return labels[modalidade] || modalidade;
 };
 
 export const criarPedidoCatalogo = async (
@@ -68,7 +60,7 @@ export const criarPedidoCatalogo = async (
     const numeroPedido = await gerarNumeroPedido();
 
     const valorTotal = dados.items.reduce((total, item) => {
-      const preco = calcularPrecoItem(item, dados.modalidade);
+      const preco = getPrecoByModalidade(item.produto, dados.modalidade);
       return total + preco * item.quantidade;
     }, 0);
 
@@ -85,6 +77,7 @@ export const criarPedidoCatalogo = async (
         observacoes: dados.observacoes || '',
         origem: 'catalogo',
         modalidade_pagamento: dados.modalidade,
+        forma_pagamento: getModalidadeLabel(dados.modalidade),
       })
       .select()
       .single();
@@ -96,7 +89,7 @@ export const criarPedidoCatalogo = async (
       produto_id: item.produto.id,
       produto_nome: item.produto.nome,
       quantidade: item.quantidade,
-      preco_unitario: calcularPrecoItem(item, dados.modalidade),
+      preco_unitario: getPrecoByModalidade(item.produto, dados.modalidade),
     }));
 
     const { error: itensError } = await supabase

@@ -7,21 +7,18 @@ export interface Metric {
 
 export interface Pedido {
   id: string;
-  numero_pedido: string;
+  numero?: number;
   cliente: string;
   telefone: string;
-  email: string;
+  email?: string;
   endereco?: string;
-  valor_total: number;
-  status: 'Novo' | 'Em Atendimento' | 'Finalizado';
-  itens: ItemPedido[];
-  observacoes: string;
-  origem?: 'manual' | 'catalogo';
-  modalidade_pagamento?: ModalidadePagamento;
-  created_by_user_id?: string;
-  updated_by_user_id?: string;
+  items: ItemPedido[];
+  total: number;
+  status: string;
+  forma_pagamento?: string; // ADICIONE ESTA LINHA
+  observacoes?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface ItemPedido {
@@ -39,22 +36,22 @@ export interface Produto {
   id: string;
   codigo: string;
   nome: string;
-  preco: number;
+  preco: number; // Mantém para compatibilidade
+  preco_varejo?: number;
   preco_cartao?: number;
   preco_pix?: number;
   preco_dinheiro?: number;
-  preco_oferta?: number;
-  image_url?: string;
-  image_storage_path?: string;
+  categoria?: string;
   subcategoria_id?: string;
-  subcategoria?: Categoria;
-  created_by_user_id?: string;
-  updated_by_user_id?: string;
+  subcategoria?: string;
+  marca?: string;
+  imagem_url?: string;
+  ativo?: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export type ModalidadePagamento = 'cartao' | 'pix' | 'dinheiro' | 'oferta';
+export type ModalidadePagamento = 'varejo' | 'cartao' | 'pix' | 'dinheiro';
 
 export interface RegraPreco {
   nome: string;

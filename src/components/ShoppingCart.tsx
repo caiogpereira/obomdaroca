@@ -1,13 +1,13 @@
 import { ShoppingCart as CartIcon, X, Plus, Minus, Trash2, Lock, Check, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { CarrinhoItem, ModalidadePagamento } from '../types';
-import { validatePricingRules, getBestAvailablePaymentMethod } from '../utils/pricingValidation';
+import { validatePricingRules, getBestAvailablePaymentMethod, getPrecoByModalidade } from '../utils/pricingValidation';
 
 interface ShoppingCartProps {
   items: CarrinhoItem[];
   onUpdateQuantity: (produtoId: string, quantidade: number) => void;
   onRemoveItem: (produtoId: string) => void;
-  onCheckout: () => void;
+  onCheckout: (modalidade: ModalidadePagamento) => void;
   onClose: () => void;
 }
 
@@ -18,11 +18,12 @@ export const ShoppingCart = ({
   onCheckout,
   onClose,
 }: ShoppingCartProps) => {
-  const [modalidade, setModalidade] = useState<ModalidadePagamento>('cartao');
+  const [modalidade, setModalidade] = useState<ModalidadePagamento>('varejo');
 
   const availability = validatePricingRules(items);
 
   useEffect(() => {
+    // Se a modalidade atual não está mais disponível, muda para a melhor disponível
     if (!availability[modalidade].isValid) {
       const bestMethod = getBestAvailablePaymentMethod(availability);
       setModalidade(bestMethod);
@@ -30,19 +31,7 @@ export const ShoppingCart = ({
   }, [items]);
 
   const getPreco = (item: CarrinhoItem): number => {
-    const produto = item.produto;
-    switch (modalidade) {
-      case 'cartao':
-        return produto.preco_cartao || produto.preco;
-      case 'pix':
-        return produto.preco_pix || produto.preco;
-      case 'dinheiro':
-        return produto.preco_dinheiro || produto.preco;
-      case 'oferta':
-        return produto.preco_oferta || produto.preco;
-      default:
-        return produto.preco;
-    }
+    return getPrecoByModalidade(item.produto, modalidade);
   };
 
   const calcularTotal = (): number => {
@@ -50,16 +39,20 @@ export const ShoppingCart = ({
   };
 
   const modalidades: { value: ModalidadePagamento; label: string; descricao: string }[] = [
-    { value: 'cartao', label: 'Cartão/Varejo', descricao: 'Sem quantidade mínima' },
-    { value: 'pix', label: 'PIX/TED', descricao: 'Min. R$ 300 ou 10 unidades do mesmo produto' },
-    { value: 'dinheiro', label: 'Dinheiro', descricao: 'Min. R$ 500 ou 15 unidades do mesmo produto' },
-    { value: 'oferta', label: 'Oferta', descricao: '30 unidades do mesmo produto' },
+    { value: 'varejo', label: 'Varejo', descricao: 'Sem quantidade mínima' },
+    { value: 'cartao', label: 'Cartão', descricao: 'Min. R$ 300 ou 10 unidades mesmo produto/marca' },
+    { value: 'pix', label: 'PIX', descricao: 'Min. R$ 300 ou 15 unidades mesmo produto/marca' },
+    { value: 'dinheiro', label: 'TED/Dinheiro', descricao: 'Min. R$ 300 ou 15 unidades mesmo produto/marca' },
   ];
 
   const handleModalidadeClick = (value: ModalidadePagamento) => {
     if (availability[value].isValid) {
       setModalidade(value);
     }
+  };
+
+  const handleCheckout = () => {
+    onCheckout(modalidade);
   };
 
   const totalItens = items.reduce((sum, item) => sum + item.quantidade, 0);
@@ -144,9 +137,9 @@ export const ShoppingCart = ({
                     key={item.produto.id}
                     className="flex gap-4 p-4 border border-gray-200 rounded-lg"
                   >
-                    {item.produto.image_url && (
+                    {item.produto.imagem_url && (
                       <img
-                        src={item.produto.image_url}
+                        src={item.produto.imagem_url}
                         alt={item.produto.nome}
                         className="w-20 h-20 object-cover rounded-lg"
                       />
@@ -154,6 +147,9 @@ export const ShoppingCart = ({
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">{item.produto.nome}</h3>
                       <p className="text-sm text-gray-500">{item.produto.codigo}</p>
+                      {item.produto.marca && (
+                        <p className="text-xs text-gray-400">Marca: {item.produto.marca}</p>
+                      )}
                       <p className="text-lg font-bold text-red-600 mt-1">
                         R$ {getPreco(item).toFixed(2)}
                       </p>
@@ -208,6 +204,12 @@ export const ShoppingCart = ({
 
         {items.length > 0 && (
           <div className="border-t border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Forma de pagamento:</span>
+              <span className="text-sm font-medium text-gray-900">
+                {modalidades.find(m => m.value === modalidade)?.label}
+              </span>
+            </div>
             <div className="flex justify-between items-center mb-4">
               <span className="text-lg font-medium text-gray-900">Total</span>
               <span className="text-2xl font-bold text-red-600">
@@ -215,7 +217,7 @@ export const ShoppingCart = ({
               </span>
             </div>
             <button
-              onClick={onCheckout}
+              onClick={handleCheckout}
               className="w-full py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
             >
               Finalizar Pedido

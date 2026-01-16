@@ -8,6 +8,7 @@ import { CheckoutModal } from '../components/CheckoutModal';
 import { Toast } from '../components/Toast';
 import { criarPedidoCatalogo } from '../services/pedidoService';
 import { Link } from 'react-router-dom';
+import { getPrecoByModalidade } from '../utils/pricingValidation';
 
 export const Catalogo = () => {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -17,14 +18,17 @@ export const Catalogo = () => {
   const [carrinho, setCarrinho] = useState<CarrinhoItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutModalidade, setCheckoutModalidade] = useState<ModalidadePagamento>('varejo');
   const [whatsappLoja, setWhatsappLoja] = useState('553599731201');
   const [loading, setLoading] = useState(true);
   const [salvandoPedido, setSalvandoPedido] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-// Define o título da página
+
+  // Define o título da página
   useEffect(() => {
     document.title = 'Catálogo Virtual - O Bom da Roça';
   }, []);
+
   useEffect(() => {
     fetchConfiguracoes();
     fetchCategorias();
@@ -96,15 +100,17 @@ export const Catalogo = () => {
         id: p.id,
         codigo: p.codigo,
         nome: p.nome,
-        preco: parseFloat(p.preco),
+        preco: parseFloat(p.preco) || 0,
+        preco_varejo: p.preco_varejo ? parseFloat(p.preco_varejo) : undefined,
         preco_cartao: p.preco_cartao ? parseFloat(p.preco_cartao) : undefined,
         preco_pix: p.preco_pix ? parseFloat(p.preco_pix) : undefined,
         preco_dinheiro: p.preco_dinheiro ? parseFloat(p.preco_dinheiro) : undefined,
-        preco_oferta: p.preco_oferta ? parseFloat(p.preco_oferta) : undefined,
-        image_url: p.image_url || undefined,
+        categoria: p.categoria || undefined,
+        marca: p.marca || undefined,
+        imagem_url: p.imagem_url || p.image_url || undefined,
         image_storage_path: p.image_storage_path || undefined,
         subcategoria_id: p.subcategoria_id,
-        subcategoria: p.subcategoria,
+        subcategoria: p.subcategoria?.nome || p.subcategoria,
       }));
 
       setProdutos(produtosFormatados);
@@ -124,21 +130,21 @@ export const Catalogo = () => {
     return matchSearch && matchCategoria;
   });
 
-const handleAddToCart = (produto: Produto, quantity: number = 1) => {
-  const existingItem = carrinho.find((item) => item.produto.id === produto.id);
-  if (existingItem) {
-    setCarrinho(
-      carrinho.map((item) =>
-        item.produto.id === produto.id
-          ? { ...item, quantidade: item.quantidade + quantity }
-          : item
-      )
-    );
-  } else {
-    setCarrinho([...carrinho, { produto, quantidade: quantity }]);
-  }
-  setToast({ message: `${produto.nome} adicionado ao carrinho`, type: 'success' });
-};
+  const handleAddToCart = (produto: Produto, quantity: number = 1) => {
+    const existingItem = carrinho.find((item) => item.produto.id === produto.id);
+    if (existingItem) {
+      setCarrinho(
+        carrinho.map((item) =>
+          item.produto.id === produto.id
+            ? { ...item, quantidade: item.quantidade + quantity }
+            : item
+        )
+      );
+    } else {
+      setCarrinho([...carrinho, { produto, quantidade: quantity }]);
+    }
+    setToast({ message: `${produto.nome} adicionado ao carrinho`, type: 'success' });
+  };
 
   const handleUpdateQuantity = (produtoId: string, quantidade: number) => {
     if (quantidade <= 0) {
@@ -156,8 +162,8 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
     setCarrinho(carrinho.filter((item) => item.produto.id !== produtoId));
   };
 
-
-  const handleCheckout = () => {
+  const handleCheckout = (modalidade: ModalidadePagamento) => {
+    setCheckoutModalidade(modalidade);
     setShowCart(false);
     setShowCheckout(true);
   };
@@ -189,25 +195,10 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
     }
 
     const modalidadeLabel: Record<ModalidadePagamento, string> = {
-      cartao: 'Cartão/Varejo',
-      pix: 'PIX/TED',
-      dinheiro: 'Dinheiro',
-      oferta: 'Oferta',
-    };
-
-    const getPrecoItem = (produto: Produto, modalidade: ModalidadePagamento): number => {
-      switch (modalidade) {
-        case 'cartao':
-          return produto.preco_cartao || produto.preco;
-        case 'pix':
-          return produto.preco_pix || produto.preco;
-        case 'dinheiro':
-          return produto.preco_dinheiro || produto.preco;
-        case 'oferta':
-          return produto.preco_oferta || produto.preco;
-        default:
-          return produto.preco;
-      }
+      varejo: 'Varejo',
+      cartao: 'Cartão',
+      pix: 'PIX',
+      dinheiro: 'TED/Dinheiro',
     };
 
     const numeroPedidoTexto = resultado.success && resultado.numeroPedido
@@ -218,12 +209,14 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
       ? `\n*Observações:* ${dados.observacoes}\n`
       : '';
 
-    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n*Telefone:* ${dados.telefone}\n*Endereço:* ${dados.endereco}${observacoesTexto}\n*Modalidade:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
-  .map(
-    (item) =>
-      `• ${item.produto.nome} (${item.produto.codigo})\n  Quantidade: ${item.quantidade}\n  Preço unitário: R$ ${getPrecoItem(item.produto, dados.modalidade).toFixed(2)}\n  Subtotal: R$ ${(getPrecoItem(item.produto, dados.modalidade) * item.quantidade).toFixed(2)}`
-  )
-  .join('\n\n')}\n\n*Total: R$ ${dados.total.toFixed(2)}*`;
+    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n*Telefone:* ${dados.telefone}\n*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
+      .map(
+        (item) => {
+          const precoUnit = getPrecoByModalidade(item.produto, dados.modalidade);
+          return `• ${item.produto.nome} (${item.produto.codigo})\n  Quantidade: ${item.quantidade}\n  Preço unitário: R$ ${precoUnit.toFixed(2)}\n  Subtotal: R$ ${(precoUnit * item.quantidade).toFixed(2)}`;
+        }
+      )
+      .join('\n\n')}\n\n*Total: R$ ${dados.total.toFixed(2)}*`;
 
     const whatsappUrl = `https://wa.me/${whatsappLoja}?text=${encodeURIComponent(mensagem)}`;
     window.open(whatsappUrl, '_blank');
@@ -246,17 +239,17 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
                 className="w-12 h-12 object-contain"
               />
               <div>
-              <h1 className="text-xl font-bold text-gray-900">O Bom da Roça</h1>
-              <p className="text-sm text-gray-500">Catálogo de Produtos</p>
-            </div>
-            
-            {/* Link para área administrativa */}
-            <Link
-              to="/login"
-              className="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-            >
-              Área Administrativa
-            </Link>
+                <h1 className="text-xl font-bold text-gray-900">O Bom da Roça</h1>
+                <p className="text-sm text-gray-500">Catálogo de Produtos</p>
+              </div>
+              
+              {/* Link para área administrativa */}
+              <Link
+                to="/login"
+                className="ml-4 text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
+              >
+                Área Administrativa
+              </Link>
             </div>
             <button
               onClick={() => setShowCart(true)}
@@ -304,7 +297,6 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
               </div>
             </div>
           </div>
-
         </div>
 
         {loading ? (
@@ -342,6 +334,7 @@ const handleAddToCart = (produto: Produto, quantity: number = 1) => {
       {showCheckout && !salvandoPedido && (
         <CheckoutModal
           items={carrinho}
+          modalidade={checkoutModalidade}
           onClose={() => setShowCheckout(false)}
           onConfirm={handleConfirmCheckout}
         />
