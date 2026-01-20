@@ -1,75 +1,217 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 import { Metric, Periodo } from '../types';
 
-// GET /api/metricas?periodo={periodo} - Buscar métricas do período
-// Parâmetros: periodo (hoje, ontem, 7dias, semana, mes, personalizado)
-// Para personalizado, adicionar: &dataInicial=YYYY-MM-DD&dataFinal=YYYY-MM-DD
-// Resposta: Array de objetos Metric: { label: string, value: string | number, change?: number, icon: string }
+const getDateRange = (periodo: Periodo): { start: Date; end: Date } => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(today);
+  end.setHours(23, 59, 59, 999);
 
-const metricsData: Record<Periodo, Metric[]> = {
-  hoje: [
-    { label: 'Atendimentos Totais', value: 147, change: 12, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 23, change: 8, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '15.6%', change: -2, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 2.840,50', change: 25, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 123,50', change: 18, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 8, icon: 'clock' },
-  ],
-  ontem: [
-    { label: 'Atendimentos Totais', value: 131, change: 5, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 21, change: 3, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '16.0%', change: 1, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 2.272,00', change: 15, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 108,19', change: 12, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 5, icon: 'clock' },
-  ],
-  '7dias': [
-    { label: 'Atendimentos Totais', value: 892, change: 18, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 145, change: 22, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '16.3%', change: 4, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 17.920,00', change: 30, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 123,59', change: 8, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 12, icon: 'clock' },
-  ],
-  semana: [
-    { label: 'Atendimentos Totais', value: 654, change: 10, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 98, change: 15, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '15.0%', change: 5, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 12.100,00', change: 20, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 123,47', change: 5, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 10, icon: 'clock' },
-  ],
-  mes: [
-    { label: 'Atendimentos Totais', value: 2847, change: 25, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 412, change: 28, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '14.5%', change: 3, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 51.890,00', change: 35, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 125,95', change: 7, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 18, icon: 'clock' },
-  ],
-  personalizado: [
-    { label: 'Atendimentos Totais', value: 450, change: 0, icon: 'users' },
-    { label: 'Pedidos Gerados', value: 67, change: 0, icon: 'shopping-bag' },
-    { label: 'Taxa de Conversão', value: '14.9%', change: 0, icon: 'trending-up' },
-    { label: 'Valor Total Vendas', value: 'R$ 8.250,00', change: 0, icon: 'dollar-sign' },
-    { label: 'Ticket Médio', value: 'R$ 123,13', change: 0, icon: 'credit-card' },
-    { label: 'Pedidos Pendentes', value: 6, icon: 'clock' },
-  ],
+  let start = new Date(today);
+
+  switch (periodo) {
+    case 'hoje':
+      break;
+    case 'ontem':
+      start.setDate(start.getDate() - 1);
+      end.setDate(end.getDate() - 1);
+      break;
+    case '7dias':
+      start.setDate(start.getDate() - 6);
+      break;
+    case 'semana':
+      const dayOfWeek = start.getDay();
+      const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      start.setDate(start.getDate() - diffToMonday);
+      break;
+    case 'mes':
+      start.setDate(1);
+      break;
+    case 'personalizado':
+      start.setDate(start.getDate() - 30);
+      break;
+  }
+
+  start.setHours(0, 0, 0, 0);
+  return { start, end };
+};
+
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
 };
 
 export const useMetrics = (periodo: Periodo) => {
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchMetrics = useCallback(async () => {
     setLoading(true);
-    const timer = setTimeout(() => {
-      setMetrics(metricsData[periodo]);
-      setLoading(false);
-    }, 800);
+    try {
+      const { start, end } = getDateRange(periodo);
 
-    return () => clearTimeout(timer);
+      // Buscar pedidos ATIVOS do período atual
+      const { data: pedidosAtivos, error: pedidosError } = await supabase
+        .from('pedidos')
+        .select('*')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString());
+
+      if (pedidosError) throw pedidosError;
+
+      // Buscar pedidos ARQUIVADOS do período atual
+      const { data: pedidosArquivados, error: arquivadosError } = await supabase
+        .from('pedidos_arquivados')
+        .select('*')
+        .gte('pedido_created_at', start.toISOString())
+        .lte('pedido_created_at', end.toISOString());
+
+      if (arquivadosError) throw arquivadosError;
+
+      // Combinar pedidos ativos e arquivados
+      const pedidosAtuais = [
+        ...(pedidosAtivos || []).map(p => ({
+          ...p,
+          valor_total: parseFloat(p.valor_total) || 0,
+          isArquivado: false,
+        })),
+        ...(pedidosArquivados || []).map(p => ({
+          ...p,
+          created_at: p.pedido_created_at,
+          valor_total: parseFloat(p.valor_total) || 0,
+          status: 'Finalizado',
+          isArquivado: true,
+        })),
+      ];
+
+      // Calcular período anterior
+      const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const previousStart = new Date(start);
+      previousStart.setDate(previousStart.getDate() - diffDays);
+      const previousEnd = new Date(start);
+      previousEnd.setMilliseconds(-1);
+
+      // Buscar pedidos ATIVOS do período anterior
+      const { data: pedidosAtivosAnt } = await supabase
+        .from('pedidos')
+        .select('*')
+        .gte('created_at', previousStart.toISOString())
+        .lte('created_at', previousEnd.toISOString());
+
+      // Buscar pedidos ARQUIVADOS do período anterior
+      const { data: pedidosArquivadosAnt } = await supabase
+        .from('pedidos_arquivados')
+        .select('*')
+        .gte('pedido_created_at', previousStart.toISOString())
+        .lte('pedido_created_at', previousEnd.toISOString());
+
+      // Combinar pedidos anteriores
+      const pedidosAnteriores = [
+        ...(pedidosAtivosAnt || []).map(p => ({
+          ...p,
+          valor_total: parseFloat(p.valor_total) || 0,
+        })),
+        ...(pedidosArquivadosAnt || []).map(p => ({
+          ...p,
+          created_at: p.pedido_created_at,
+          valor_total: parseFloat(p.valor_total) || 0,
+          status: 'Finalizado',
+        })),
+      ];
+
+      // Buscar atendimentos do período atual
+      const { data: atendimentosAtuais } = await supabase
+        .from('atendimentos')
+        .select('*')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString());
+
+      // Buscar atendimentos do período anterior
+      const { data: atendimentosAnteriores } = await supabase
+        .from('atendimentos')
+        .select('*')
+        .gte('created_at', previousStart.toISOString())
+        .lte('created_at', previousEnd.toISOString());
+
+      // Buscar pedidos pendentes (não finalizados) - apenas da tabela ativa
+      const { data: pedidosPendentes } = await supabase
+        .from('pedidos')
+        .select('*')
+        .neq('status', 'Finalizado');
+
+      // Calcular métricas atuais
+      const pedidosFinalizados = pedidosAtuais.filter(p => p.status === 'Finalizado');
+      const totalVendas = pedidosFinalizados.reduce((acc, p) => acc + p.valor_total, 0);
+      const ticketMedio = pedidosFinalizados.length > 0 ? totalVendas / pedidosFinalizados.length : 0;
+      const totalAtendimentos = (atendimentosAtuais || []).length + pedidosAtuais.length;
+      const taxaConversao = totalAtendimentos > 0 ? (pedidosAtuais.length / totalAtendimentos) * 100 : 0;
+
+      // Calcular métricas anteriores
+      const pedidosFinalizadosAnt = pedidosAnteriores.filter(p => p.status === 'Finalizado');
+      const totalVendasAnt = pedidosFinalizadosAnt.reduce((acc, p) => acc + p.valor_total, 0);
+      const ticketMedioAnt = pedidosFinalizadosAnt.length > 0 ? totalVendasAnt / pedidosFinalizadosAnt.length : 0;
+      const totalAtendimentosAnt = (atendimentosAnteriores || []).length + pedidosAnteriores.length;
+      const taxaConversaoAnt = totalAtendimentosAnt > 0 ? (pedidosAnteriores.length / totalAtendimentosAnt) * 100 : 0;
+
+      // Calcular variações percentuais
+      const calcChange = (atual: number, anterior: number): number => {
+        if (anterior === 0) return atual > 0 ? 100 : 0;
+        return Math.round(((atual - anterior) / anterior) * 100);
+      };
+
+      const metricsData: Metric[] = [
+        {
+          label: 'Atendimentos Totais',
+          value: totalAtendimentos,
+          change: calcChange(totalAtendimentos, totalAtendimentosAnt),
+          icon: 'users',
+        },
+        {
+          label: 'Pedidos Gerados',
+          value: pedidosAtuais.length,
+          change: calcChange(pedidosAtuais.length, pedidosAnteriores.length),
+          icon: 'shopping-bag',
+        },
+        {
+          label: 'Taxa de Conversão',
+          value: `${taxaConversao.toFixed(1)}%`,
+          change: calcChange(taxaConversao, taxaConversaoAnt),
+          icon: 'trending-up',
+        },
+        {
+          label: 'Valor Total Vendas',
+          value: formatCurrency(totalVendas),
+          change: calcChange(totalVendas, totalVendasAnt),
+          icon: 'dollar-sign',
+        },
+        {
+          label: 'Ticket Médio',
+          value: formatCurrency(ticketMedio),
+          change: calcChange(ticketMedio, ticketMedioAnt),
+          icon: 'credit-card',
+        },
+        {
+          label: 'Pedidos Pendentes',
+          value: (pedidosPendentes || []).length,
+          icon: 'clock',
+        },
+      ];
+
+      setMetrics(metricsData);
+    } catch (error) {
+      console.error('Erro ao buscar métricas:', error);
+      setMetrics([]);
+    } finally {
+      setLoading(false);
+    }
   }, [periodo]);
 
-  return { metrics, loading };
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
+
+  return { metrics, loading, refetch: fetchMetrics };
 };
