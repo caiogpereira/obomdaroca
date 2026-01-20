@@ -1,5 +1,5 @@
 import { TabType } from '../types';
-import { LayoutDashboard, ClipboardList, Package } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Package, Users } from 'lucide-react';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -11,6 +11,7 @@ export const TabNavigation = ({ activeTab, onTabChange }: TabNavigationProps) =>
     { id: 'atendimentos' as TabType, label: 'Atendimentos', icon: ClipboardList },
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'produtos' as TabType, label: 'Produtos', icon: Package },
+    { id: 'clientes' as TabType, label: 'Clientes', icon: Users },
   ];
 
   return (

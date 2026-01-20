@@ -118,7 +118,64 @@ export type Periodo = 'hoje' | 'ontem' | '7dias' | 'semana' | 'mes' | 'personali
 
 export type ViewMode = 'table' | 'kanban';
 
-export type TabType = 'atendimentos' | 'dashboard' | 'produtos';
+export type TabType = 'atendimentos' | 'dashboard' | 'produtos' | 'clientes';
+
+// ============================================
+// CRM - TIPOS DE CLIENTE
+// ============================================
+
+export type SegmentoCliente = 'vip' | 'frequente' | 'ativo' | 'inativo' | 'novo';
+
+export interface Cliente {
+  id: string;
+  nome: string;
+  telefone: string;
+  email?: string;
+  cpf_cnpj?: string;
+  nome_empresa?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  observacoes?: string;
+  origem: 'manual' | 'whatsapp' | 'catalogo' | 'importacao';
+  
+  // Métricas (calculadas automaticamente)
+  segmento: SegmentoCliente;
+  total_gasto: number;
+  total_pedidos: number;
+  ticket_medio: number;
+  primeira_compra?: string;
+  ultima_compra?: string;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClienteFormData {
+  nome: string;
+  telefone: string;
+  email?: string;
+  cpf_cnpj?: string;
+  nome_empresa?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  observacoes?: string;
+}
+
+export interface ProdutoTopCliente {
+  produto_nome: string;
+  total_quantidade: number;
+  total_pedidos: number;
+  total_valor: number;
+}
+
+export interface ClienteComHistorico extends Cliente {
+  pedidos: Pedido[];
+  produtos_top: ProdutoTopCliente[];
+}
 
 export interface PedidoArquivado {
   id: string;

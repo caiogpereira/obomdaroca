@@ -5,10 +5,12 @@ import { Toast } from '../components/Toast';
 import { Atendimentos } from './Atendimentos';
 import { Dashboard } from './Dashboard';
 import { Produtos } from './Produtos';
+import { Clientes } from './Clientes';
 import { useSupabasePedidos } from '../hooks/useSupabasePedidos';
 import { useSupabaseProdutos } from '../hooks/useSupabaseProdutos';
 import { useSupabaseAtendimentos } from '../hooks/useSupabaseAtendimentos';
 import { useSupabaseCategorias } from '../hooks/useSupabaseCategorias';
+import { useSupabaseClientes } from '../hooks/useSupabaseClientes';
 import { useNotifications } from '../hooks/useNotifications';
 import { TabType, Periodo } from '../types';
 import { generateReport } from '../utils/pdfGenerator';
@@ -61,6 +63,12 @@ export const AdminLayout = () => {
     updateCategoria,
     deleteCategoria,
   } = useSupabaseCategorias();
+
+  const {
+    addCliente,
+    updateCliente,
+    deleteCliente,
+  } = useSupabaseClientes();
 
   const {
     atendimentos,
@@ -225,6 +233,33 @@ export const AdminLayout = () => {
     }
   };
 
+const handleAddCliente = async (cliente: any) => {
+    try {
+      await addCliente(cliente);
+      setToast({ message: 'Cliente adicionado com sucesso!', type: 'success' });
+    } catch (error) {
+      setToast({ message: (error as Error).message, type: 'error' });
+    }
+  };
+
+  const handleUpdateCliente = async (id: string, cliente: any) => {
+    try {
+      await updateCliente(id, cliente);
+      setToast({ message: 'Cliente atualizado com sucesso!', type: 'success' });
+    } catch (error) {
+      setToast({ message: (error as Error).message, type: 'error' });
+    }
+  };
+
+  const handleDeleteCliente = async (id: string) => {
+    try {
+      await deleteCliente(id);
+      setToast({ message: 'Cliente excluído com sucesso!', type: 'success' });
+    } catch (error) {
+      setToast({ message: (error as Error).message, type: 'error' });
+    }
+  };
+
   if (pedidosError || produtosError || atendimentosError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -273,6 +308,14 @@ export const AdminLayout = () => {
             onAddCategoria={handleAddCategoria}
             onUpdateCategoria={handleUpdateCategoria}
             onDeleteCategoria={handleDeleteCategoria}
+          />
+        )}
+
+       {activeTab === 'clientes' && (
+          <Clientes
+            onAddCliente={handleAddCliente}
+            onUpdateCliente={handleUpdateCliente}
+            onDeleteCliente={handleDeleteCliente}
           />
         )}
       </main>
