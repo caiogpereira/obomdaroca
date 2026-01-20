@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, LayoutGrid, Table as TableIcon, Filter } from 'lucide-react';
+import { Search, LayoutGrid, Table as TableIcon, Filter, Archive } from 'lucide-react';
+import { PedidosArquivadosModal } from '../components/PedidosArquivadosModal';
 import { Pedido, ViewMode, Atendimento, Produto } from '../types';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { PedidosTable } from '../components/PedidosTable';
@@ -38,6 +39,7 @@ export const Atendimentos = ({
   const [showSection, setShowSection] = useState<'pedidos' | 'atendimentos'>('pedidos');
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [pedidoModalMode, setPedidoModalMode] = useState<'view' | 'edit'>('view');
+  const [showArquivados, setShowArquivados] = useState(false);
 
   const filteredPedidos = pedidos.filter((pedido) => {
     const matchesSearch =
@@ -86,27 +88,37 @@ export const Atendimentos = ({
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Atendimentos</h2>
 
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowSection('pedidos')}
-              className={`px-4 py-2 rounded-md transition-all font-medium ${
-                showSection === 'pedidos'
-                  ? 'bg-red-600 text-white shadow'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
+              onClick={() => setShowArquivados(true)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
             >
-              Pedidos
+              <Archive size={18} />
+              Arquivados
             </button>
-            <button
-              onClick={() => setShowSection('atendimentos')}
-              className={`px-4 py-2 rounded-md transition-all font-medium ${
-                showSection === 'atendimentos'
-                  ? 'bg-red-600 text-white shadow'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Aguardando Atendimento
-            </button>
+
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setShowSection('pedidos')}
+                className={`px-4 py-2 rounded-md transition-all font-medium ${
+                  showSection === 'pedidos'
+                    ? 'bg-red-600 text-white shadow'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Pedidos
+              </button>
+              <button
+                onClick={() => setShowSection('atendimentos')}
+                className={`px-4 py-2 rounded-md transition-all font-medium ${
+                  showSection === 'atendimentos'
+                    ? 'bg-red-600 text-white shadow'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Aguardando Atendimento
+              </button>
+            </div>
           </div>
         </div>
 
@@ -232,6 +244,11 @@ export const Atendimentos = ({
           onEdit={handleSwitchToEdit}
         />
       )}
+
+       <PedidosArquivadosModal
+        isOpen={showArquivados}
+        onClose={() => setShowArquivados(false)}
+      />
     </div>
   );
 };
