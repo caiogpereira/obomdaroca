@@ -45,6 +45,7 @@ export const useSupabasePedidos = () => {
             id: pedido.id,
             numero_pedido: pedido.numero_pedido,
             cliente: pedido.cliente,
+            nome_empresa: pedido.nome_empresa || '',
             telefone: pedido.telefone,
             email: pedido.email || '',
             endereco: pedido.endereco || '',

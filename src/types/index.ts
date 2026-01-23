@@ -9,6 +9,7 @@ export interface Pedido {
   id: string;
   numero?: number;
   cliente: string;
+  nome_empresa?: string;
   telefone: string;
   email?: string;
   endereco?: string;

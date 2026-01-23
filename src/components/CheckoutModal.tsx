@@ -7,8 +7,48 @@ interface CheckoutModalProps {
   items: CarrinhoItem[];
   modalidade: ModalidadePagamento;
   onClose: () => void;
-  onConfirm: (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number; observacoes?: string }) => void;
+  onConfirm: (dados: { 
+    nome: string; 
+    nomeEmpresa?: string;
+    telefone: string; 
+    email?: string;
+    endereco: string; 
+    modalidade: ModalidadePagamento; 
+    total: number; 
+    observacoes?: string 
+  }) => void;
 }
+
+// Função para formatar texto em Title Case
+const toTitleCase = (str: string): string => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      // Palavras que devem permanecer em minúsculo
+      const lowercase = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+      if (lowercase.includes(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ')
+    // Garantir que a primeira letra sempre seja maiúscula
+    .replace(/^./, str => str.toUpperCase());
+};
+
+// Função para normalizar telefone com DDI 55
+const normalizarTelefone = (telefone: string): string => {
+  const apenasNumeros = telefone.replace(/\D/g, '');
+  // Se já tem 12-13 dígitos e começa com 55, retorna como está
+  if (apenasNumeros.length >= 12 && apenasNumeros.startsWith('55')) {
+    return apenasNumeros;
+  }
+  // Se tem 10-11 dígitos (DDD + número), adiciona 55
+  if (apenasNumeros.length >= 10 && apenasNumeros.length <= 11) {
+    return '55' + apenasNumeros;
+  }
+  return apenasNumeros;
+};
 
 export const CheckoutModal = ({
   items,
@@ -18,7 +58,9 @@ export const CheckoutModal = ({
 }: CheckoutModalProps) => {
   const [formData, setFormData] = useState({
     nome: '',
+    nomeEmpresa: '',
     telefone: '',
+    email: '',
     endereco: '',
     observacoes: '',
   });
@@ -33,10 +75,14 @@ export const CheckoutModal = ({
     if (!formData.telefone.trim()) {
       newErrors.telefone = 'Telefone é obrigatório';
     } else if (!/^\d{10,11}$/.test(formData.telefone.replace(/\D/g, ''))) {
-      newErrors.telefone = 'Telefone inválido';
+      newErrors.telefone = 'Telefone inválido (DDD + número)';
     }
     if (!formData.endereco.trim()) {
       newErrors.endereco = 'Endereço é obrigatório';
+    }
+    // Email é opcional, mas se preenchido deve ser válido
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email inválido';
     }
 
     setErrors(newErrors);
@@ -55,10 +101,12 @@ export const CheckoutModal = ({
     e.preventDefault();
     if (validate()) {
       onConfirm({
-        nome: formData.nome,
-        telefone: formData.telefone,
-        endereco: formData.endereco,
-        observacoes: formData.observacoes || undefined,
+        nome: toTitleCase(formData.nome.trim()),
+        nomeEmpresa: formData.nomeEmpresa ? toTitleCase(formData.nomeEmpresa.trim()) : undefined,
+        telefone: normalizarTelefone(formData.telefone),
+        email: formData.email.trim().toLowerCase() || undefined,
+        endereco: toTitleCase(formData.endereco.trim()),
+        observacoes: formData.observacoes.trim() || undefined,
         modalidade,
         total: calcularTotal(),
       });
@@ -126,7 +174,7 @@ export const CheckoutModal = ({
 
           {/* Dados do Cliente */}
           <div className="space-y-4">
-            <h3 className="font-medium text-gray-900">Dados para Entrega</h3>
+            <h3 className="font-medium text-gray-900">Dados do Cliente</h3>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -146,27 +194,58 @@ export const CheckoutModal = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefone/WhatsApp *
+                Nome da Empresa (opcional)
               </label>
               <input
-                type="tel"
-                value={formData.telefone}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '');
-                  setFormData({ ...formData, telefone: value });
-                }}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                  errors.telefone ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="(00) 00000-0000"
-                maxLength={11}
+                type="text"
+                value={formData.nomeEmpresa}
+                onChange={(e) => setFormData({ ...formData, nomeEmpresa: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Nome da empresa ou estabelecimento"
               />
-              {errors.telefone && <p className="mt-1 text-sm text-red-600">{errors.telefone}</p>}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Telefone/WhatsApp *
+                </label>
+                <input
+                  type="tel"
+                  value={formData.telefone}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    setFormData({ ...formData, telefone: value });
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                    errors.telefone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="(00) 00000-0000"
+                  maxLength={11}
+                />
+                {errors.telefone && <p className="mt-1 text-sm text-red-600">{errors.telefone}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  E-mail (opcional)
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                    errors.email ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="seu@email.com"
+                />
+                {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Endereço de Entrega *
+                Endereço Completo *
               </label>
               <textarea
                 value={formData.endereco}
@@ -174,7 +253,7 @@ export const CheckoutModal = ({
                 className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
                   errors.endereco ? 'border-red-500' : 'border-gray-300'
                 }`}
-                placeholder="Rua, número, complemento, bairro, cidade"
+                placeholder="Rua, número, complemento, bairro, cidade - Estado"
                 rows={3}
               />
               {errors.endereco && <p className="mt-1 text-sm text-red-600">{errors.endereco}</p>}

@@ -4,7 +4,9 @@ import { getPrecoByModalidade } from '../utils/pricingValidation';
 
 export interface DadosPedidoCatalogo {
   nome: string;
+  nomeEmpresa?: string;
   telefone: string;
+  email?: string;
   endereco: string;
   modalidade: ModalidadePagamento;
   observacoes?: string;
@@ -20,21 +22,37 @@ export interface ResultadoPedido {
 
 const gerarNumeroPedido = async (): Promise<string> => {
   try {
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select('numero_pedido')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Buscar o último número de pedido tanto em pedidos ativos quanto arquivados
+    const [pedidosAtivos, pedidosArquivados] = await Promise.all([
+      supabase
+        .from('pedidos')
+        .select('numero_pedido')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('pedidos_arquivados')
+        .select('numero_pedido')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
 
-    if (error) throw error;
+    let ultimoNumeroAtivo = 0;
+    let ultimoNumeroArquivado = 0;
 
-    if (!data || !data.numero_pedido) {
-      return '#001';
+    if (pedidosAtivos.data?.numero_pedido) {
+      ultimoNumeroAtivo = parseInt(pedidosAtivos.data.numero_pedido.replace('#', '')) || 0;
     }
 
-    const ultimoNumero = parseInt(data.numero_pedido.replace('#', ''));
+    if (pedidosArquivados.data?.numero_pedido) {
+      ultimoNumeroArquivado = parseInt(pedidosArquivados.data.numero_pedido.replace('#', '')) || 0;
+    }
+
+    // Usar o maior número encontrado
+    const ultimoNumero = Math.max(ultimoNumeroAtivo, ultimoNumeroArquivado);
     const proximoNumero = ultimoNumero + 1;
+    
     return `#${proximoNumero.toString().padStart(3, '0')}`;
   } catch (error) {
     console.error('Erro ao gerar número do pedido:', error);
@@ -69,9 +87,10 @@ export const criarPedidoCatalogo = async (
       .insert({
         numero_pedido: numeroPedido,
         cliente: dados.nome,
+        nome_empresa: dados.nomeEmpresa || null,
         telefone: dados.telefone,
         endereco: dados.endereco,
-        email: '',
+        email: dados.email || '',
         valor_total: valorTotal,
         status: 'Novo',
         observacoes: dados.observacoes || '',
