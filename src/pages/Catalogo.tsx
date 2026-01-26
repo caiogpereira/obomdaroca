@@ -170,9 +170,11 @@ export const Catalogo = () => {
 
   const handleConfirmCheckout = async (dados: { 
     nome: string; 
-    nomeEmpresa?: string;
+    nomeEmpresa: string;
+    cpfCnpj: string;
     telefone: string; 
-    email?: string;
+    email: string;
+    cep: string;
     endereco: string; 
     modalidade: ModalidadePagamento; 
     total: number; 
@@ -183,8 +185,10 @@ export const Catalogo = () => {
     const resultado = await criarPedidoCatalogo({
       nome: dados.nome,
       nomeEmpresa: dados.nomeEmpresa,
+      cpfCnpj: dados.cpfCnpj,
       telefone: dados.telefone,
       email: dados.email,
+      cep: dados.cep,
       endereco: dados.endereco,
       modalidade: dados.modalidade,
       observacoes: dados.observacoes,
@@ -220,15 +224,23 @@ export const Catalogo = () => {
       ? `*Empresa:* ${dados.nomeEmpresa}\n`
       : '';
 
+    const cpfCnpjTexto = dados.cpfCnpj
+      ? `*CPF/CNPJ:* ${dados.cpfCnpj}\n`
+      : '';
+
     const emailTexto = dados.email
       ? `*Email:* ${dados.email}\n`
+      : '';
+
+    const cepTexto = dados.cep
+      ? `*CEP:* ${dados.cep}\n`
       : '';
 
     const observacoesTexto = dados.observacoes
       ? `\n*Observações:* ${dados.observacoes}\n`
       : '';
 
-    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n${empresaTexto}*Telefone:* ${dados.telefone}\n${emailTexto}*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
+    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n${empresaTexto}${cpfCnpjTexto}*Telefone:* ${dados.telefone}\n${emailTexto}${cepTexto}*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
       .map(
         (item) => {
           const precoUnit = getPrecoByModalidade(item.produto, dados.modalidade);

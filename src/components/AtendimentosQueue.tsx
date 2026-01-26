@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Phone, Mail, Clock, AlertCircle, CheckCircle2, User } from 'lucide-react';
+import { Plus, Phone, Mail, Clock, AlertCircle, CheckCircle2, User, MessageCircle } from 'lucide-react';
 import { Atendimento } from '../types';
 import { AtendimentoModal } from './AtendimentoModal';
 
@@ -201,6 +201,22 @@ export const AtendimentosQueue = ({
 
               {atendimento.status !== 'Resolvido' && (
                 <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                  {/* Botão WhatsApp */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nome = atendimento.cliente.split(' ')[0];
+                      const mensagem = `Olá, ${nome}! Recebemos sua solicitação e darei sequência ao seu atendimento. 😊`;
+                      const telefone = atendimento.telefone.replace(/\D/g, '');
+                      const telefoneFormatado = telefone.startsWith('55') ? telefone : `55${telefone}`;
+                      window.open(`https://wa.me/${telefoneFormatado}?text=${encodeURIComponent(mensagem)}`, '_blank');
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    WhatsApp
+                  </button>
+                  
                   {atendimento.status === 'Aguardando' && (
                     <button
                       onClick={(e) => {

@@ -4,9 +4,11 @@ import { getPrecoByModalidade } from '../utils/pricingValidation';
 
 export interface DadosPedidoCatalogo {
   nome: string;
-  nomeEmpresa?: string;
+  nomeEmpresa: string;
+  cpfCnpj: string;
   telefone: string;
-  email?: string;
+  email: string;
+  cep: string;
   endereco: string;
   modalidade: ModalidadePagamento;
   observacoes?: string;
@@ -88,7 +90,9 @@ export const criarPedidoCatalogo = async (
         numero_pedido: numeroPedido,
         cliente: dados.nome,
         nome_empresa: dados.nomeEmpresa || null,
+        cpf_cnpj: dados.cpfCnpj || null,
         telefone: dados.telefone,
+        cep: dados.cep || null,
         endereco: dados.endereco,
         email: dados.email || '',
         valor_total: valorTotal,

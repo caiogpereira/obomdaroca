@@ -1,5 +1,5 @@
 import { Pedido } from '../types';
-import { Eye, Edit, CheckCircle, Clock } from 'lucide-react';
+import { Eye, Edit, CheckCircle, Clock, MessageCircle } from 'lucide-react';
 
 interface KanbanCardProps {
   pedido: Pedido;
@@ -24,6 +24,15 @@ export const KanbanCard = ({ pedido, onView, onEdit, onFinalize }: KanbanCardPro
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nome = pedido.cliente.split(' ')[0]; // Primeiro nome
+    const mensagem = `Oi, ${nome}! Vou dar sequência no seu pedido ${pedido.numero_pedido}. 😊`;
+    const telefone = pedido.telefone.replace(/\D/g, '');
+    const telefoneFormatado = telefone.startsWith('55') ? telefone : `55${telefone}`;
+    window.open(`https://wa.me/${telefoneFormatado}?text=${encodeURIComponent(mensagem)}`, '_blank');
   };
 
   const statusColors = {
@@ -101,6 +110,16 @@ export const KanbanCard = ({ pedido, onView, onEdit, onFinalize }: KanbanCardPro
           </button>
         )}
       </div>
+
+      {/* Botão WhatsApp */}
+      <button
+        onClick={handleWhatsAppClick}
+        className="w-full mt-2 p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-xs font-medium flex items-center justify-center gap-2"
+        title="Enviar WhatsApp"
+      >
+        <MessageCircle className="w-4 h-4" />
+        Enviar WhatsApp
+      </button>
     </div>
   );
 };
