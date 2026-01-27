@@ -1,5 +1,6 @@
 import { Pedido } from '../types';
 import { Eye, Edit, CheckCircle, Clock, MessageCircle } from 'lucide-react';
+import { ToggleAgenteIA } from './ToggleAgenteIA';
 
 interface KanbanCardProps {
   pedido: Pedido;
@@ -56,6 +57,15 @@ export const KanbanCard = ({ pedido, onView, onEdit, onFinalize }: KanbanCardPro
           <Clock className="w-3 h-3" />
           {formatDateTime(pedido.created_at)}
         </div>
+      </div>
+
+      {/* Toggle Agente IA - versão compacta */}
+      <div className="mb-2">
+        <ToggleAgenteIA 
+          telefone={pedido.telefone} 
+          clienteNome={pedido.cliente}
+          compact={true}
+        />
       </div>
 
       <div className="space-y-1 mb-2">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Phone, Mail, Clock, AlertCircle, CheckCircle2, User, MessageCircle } from 'lucide-react';
 import { Atendimento } from '../types';
 import { AtendimentoModal } from './AtendimentoModal';
+import { ToggleAgenteIA } from './ToggleAgenteIA';
 
 interface AtendimentosQueueProps {
   atendimentos: Atendimento[];
@@ -193,6 +194,14 @@ export const AtendimentosQueue = ({
                     {atendimento.email}
                   </div>
                 )}
+                {/* Toggle Agente IA */}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ToggleAgenteIA 
+                    telefone={atendimento.telefone} 
+                    clienteNome={atendimento.cliente}
+                    compact={true}
+                  />
+                </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <Clock className="w-4 h-4" />
                   {formatDate(atendimento.created_at)}
