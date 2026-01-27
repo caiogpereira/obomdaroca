@@ -317,6 +317,42 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
               }`}
             />
           </div>
+
+          {/* Histórico de Ações */}
+          {editedPedido.historico && editedPedido.historico.length > 0 && (
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Histórico de Ações</h4>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                {editedPedido.historico.map((acao, index) => (
+                  <div key={index} className="flex items-center justify-between text-xs border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+                    <div className="flex-1">
+                      <span className="text-gray-600">{acao.acao}</span>
+                      <span className="text-gray-400 mx-2">•</span>
+                      <span className="font-medium text-gray-700">{acao.operador_nome}</span>
+                    </div>
+                    <span className="text-gray-400 ml-2">
+                      {new Date(acao.created_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Última atualização */}
+          {editedPedido.updated_by_user_name && (
+            <div className="mt-3 text-xs text-gray-500 text-right">
+              Última atualização por <span className="font-medium">{editedPedido.updated_by_user_name}</span>
+              {editedPedido.updated_at && (
+                <span> em {new Date(editedPedido.updated_at).toLocaleString('pt-BR')}</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
