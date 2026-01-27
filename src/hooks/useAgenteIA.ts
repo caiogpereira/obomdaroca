@@ -101,18 +101,11 @@ export const useAgenteIA = () => {
 
       const telefoneNormalizado = telefone.replace(/\D/g, '');
 
-      // Desativar bloqueios anteriores
+      // DELETA registros anteriores deste telefone (limpa a tabela)
       await supabase
         .from('agente_ia_bloqueio')
-        .update({
-          ativo: false,
-          desativado_por_user_id: usuario.id,
-          desativado_por_user_name: usuario.nome,
-          desativado_em: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('telefone', telefoneNormalizado)
-        .eq('ativo', true);
+        .delete()
+        .eq('telefone', telefoneNormalizado);
 
       // Criar novo bloqueio
       const expiraEm = new Date();
@@ -146,26 +139,16 @@ export const useAgenteIA = () => {
   }, []);
 
   // Desativar atendimento humano (reativar agente IA)
+  // DELETA o registro ao invés de marcar ativo=false
   const desativarAtendimentoHumano = useCallback(async (telefone: string): Promise<boolean> => {
     setLoading(true);
     try {
-      const usuario = await getUsuarioAtual();
-      if (!usuario) {
-        console.error('Usuário não autenticado');
-        return false;
-      }
-
       const telefoneNormalizado = telefone.replace(/\D/g, '');
 
+      // DELETA o registro ao invés de apenas marcar como inativo
       const { error } = await supabase
         .from('agente_ia_bloqueio')
-        .update({
-          ativo: false,
-          desativado_por_user_id: usuario.id,
-          desativado_por_user_name: usuario.nome,
-          desativado_em: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .delete()
         .eq('telefone', telefoneNormalizado)
         .eq('ativo', true);
 
