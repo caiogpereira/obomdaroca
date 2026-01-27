@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bot, BotOff, Clock, User } from 'lucide-react';
+import { Bot, UserCheck, Clock, User } from 'lucide-react';
 import { useAgenteIA } from '../hooks/useAgenteIA';
 
 interface ToggleAgenteIAProps {
@@ -91,7 +91,7 @@ export const ToggleAgenteIA = ({ telefone, clienteNome, compact = false, onToggl
       >
         {bloqueado ? (
           <>
-            <BotOff size={14} />
+            <UserCheck size={14} />
             <span>Humano</span>
           </>
         ) : (
@@ -110,7 +110,7 @@ export const ToggleAgenteIA = ({ telefone, clienteNome, compact = false, onToggl
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {bloqueado ? (
-            <BotOff className="w-5 h-5 text-orange-600" />
+            <UserCheck className="w-5 h-5 text-orange-600" />
           ) : (
             <Bot className="w-5 h-5 text-green-600" />
           )}
