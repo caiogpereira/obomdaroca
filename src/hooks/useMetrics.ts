@@ -62,14 +62,16 @@ export const useMetrics = (periodo: Periodo) => {
 
       if (pedidosError) throw pedidosError;
 
-      // Buscar pedidos ARQUIVADOS do período atual
+      // Buscar pedidos ARQUIVADOS do período atual (usando created_at que é a data original do pedido)
       const { data: pedidosArquivados, error: arquivadosError } = await supabase
         .from('pedidos_arquivados')
         .select('*')
-        .gte('pedido_created_at', start.toISOString())
-        .lte('pedido_created_at', end.toISOString());
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString());
 
-      if (arquivadosError) throw arquivadosError;
+      if (arquivadosError) {
+        console.warn('Erro ao buscar arquivados:', arquivadosError);
+      }
 
       // Combinar pedidos ativos e arquivados
       const pedidosAtuais = [
@@ -80,7 +82,6 @@ export const useMetrics = (periodo: Periodo) => {
         })),
         ...(pedidosArquivados || []).map(p => ({
           ...p,
-          created_at: p.pedido_created_at,
           valor_total: parseFloat(p.valor_total) || 0,
           status: 'Finalizado',
           isArquivado: true,
@@ -105,8 +106,8 @@ export const useMetrics = (periodo: Periodo) => {
       const { data: pedidosArquivadosAnt } = await supabase
         .from('pedidos_arquivados')
         .select('*')
-        .gte('pedido_created_at', previousStart.toISOString())
-        .lte('pedido_created_at', previousEnd.toISOString());
+        .gte('created_at', previousStart.toISOString())
+        .lte('created_at', previousEnd.toISOString());
 
       // Combinar pedidos anteriores
       const pedidosAnteriores = [
@@ -116,7 +117,6 @@ export const useMetrics = (periodo: Periodo) => {
         })),
         ...(pedidosArquivadosAnt || []).map(p => ({
           ...p,
-          created_at: p.pedido_created_at,
           valor_total: parseFloat(p.valor_total) || 0,
           status: 'Finalizado',
         })),
@@ -142,17 +142,15 @@ export const useMetrics = (periodo: Periodo) => {
         .select('*')
         .neq('status', 'Finalizado');
 
-      // Calcular métricas atuais
-      const pedidosFinalizados = pedidosAtuais.filter(p => p.status === 'Finalizado');
-      const totalVendas = pedidosFinalizados.reduce((acc, p) => acc + p.valor_total, 0);
-      const ticketMedio = pedidosFinalizados.length > 0 ? totalVendas / pedidosFinalizados.length : 0;
+      // Calcular métricas atuais - TODOS os pedidos contam para vendas (não só finalizados)
+      const totalVendas = pedidosAtuais.reduce((acc, p) => acc + p.valor_total, 0);
+      const ticketMedio = pedidosAtuais.length > 0 ? totalVendas / pedidosAtuais.length : 0;
       const totalAtendimentos = (atendimentosAtuais || []).length + pedidosAtuais.length;
       const taxaConversao = totalAtendimentos > 0 ? (pedidosAtuais.length / totalAtendimentos) * 100 : 0;
 
       // Calcular métricas anteriores
-      const pedidosFinalizadosAnt = pedidosAnteriores.filter(p => p.status === 'Finalizado');
-      const totalVendasAnt = pedidosFinalizadosAnt.reduce((acc, p) => acc + p.valor_total, 0);
-      const ticketMedioAnt = pedidosFinalizadosAnt.length > 0 ? totalVendasAnt / pedidosFinalizadosAnt.length : 0;
+      const totalVendasAnt = pedidosAnteriores.reduce((acc, p) => acc + p.valor_total, 0);
+      const ticketMedioAnt = pedidosAnteriores.length > 0 ? totalVendasAnt / pedidosAnteriores.length : 0;
       const totalAtendimentosAnt = (atendimentosAnteriores || []).length + pedidosAnteriores.length;
       const taxaConversaoAnt = totalAtendimentosAnt > 0 ? (pedidosAnteriores.length / totalAtendimentosAnt) * 100 : 0;
 

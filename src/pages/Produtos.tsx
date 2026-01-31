@@ -7,7 +7,6 @@ import { CategoriaModal } from '../components/CategoriaModal';
 import { ImportarProdutosSaurus } from '../components/ImportarProdutosSaurus';
 
 // URL do webhook N8N para importação do Saurus
-// IMPORTANTE: Altere esta URL para a URL real do seu N8N
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_SAURUS || 'https://meueditor.manager01.exponensialab.com.br/webhook/importar-produtos-saurus';
 
 interface ProdutosProps {
@@ -144,39 +143,39 @@ export const Produtos = ({
               <>
                 <button
                   onClick={() => setShowCategoriaModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium border border-gray-300"
                 >
-                  <FolderKanban className="w-5 h-5" />
-                  Gerenciar Categorias
+                  <FolderKanban className="w-4 h-4" />
+                  Categorias
                 </button>
                 <button
                   onClick={() => setShowSaurusImport(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium border border-green-300"
+                  className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium border border-green-300"
                   title="Importar produtos do Saurus PDV"
                 >
-                  <RefreshCw className="w-5 h-5" />
-                  Sincronizar Saurus
+                  <RefreshCw className="w-4 h-4" />
+                  Saurus
                 </button>
                 <button
                   onClick={() => setShowUpload(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium border border-gray-300"
                 >
-                  <Upload className="w-5 h-5" />
-                  Importar Planilha
+                  <Upload className="w-4 h-4" />
+                  Planilha
                 </button>
                 <button
                   onClick={() => setSelectionMode(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-300"
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium border border-gray-300"
                 >
-                  <CheckSquare className="w-5 h-5" />
-                  Seleção Múltipla
+                  <CheckSquare className="w-4 h-4" />
+                  Selecionar
                 </button>
                 <button
                   onClick={handleAdd}
-                  className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium shadow-sm hover:shadow"
                 >
-                  <Plus className="w-5 h-5" />
-                  Novo Produto
+                  <Plus className="w-4 h-4" />
+                  Novo
                 </button>
               </>
             ) : (

@@ -5,20 +5,38 @@ export interface Metric {
   icon: string;
 }
 
+export interface HistoricoAcao {
+  id: string;
+  pedido_id: string;
+  acao: string;
+  status_anterior?: string;
+  status_novo?: string;
+  operador_id: string;
+  operador_nome: string;
+  created_at: string;
+}
+
 export interface Pedido {
   id: string;
   numero?: number;
   cliente: string;
+  nome_empresa?: string;
   telefone: string;
   email?: string;
   endereco?: string;
   items: ItemPedido[];
   total: number;
   status: string;
-  forma_pagamento?: string; // ADICIONE ESTA LINHA
+  forma_pagamento?: string;
   observacoes?: string;
   created_at: string;
   updated_at?: string;
+  // Campos de operador
+  created_by_user_id?: string;
+  created_by_user_name?: string;
+  updated_by_user_id?: string;
+  updated_by_user_name?: string;
+  historico?: HistoricoAcao[];
 }
 
 export interface ItemPedido {
