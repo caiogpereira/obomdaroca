@@ -39,27 +39,50 @@ export const useSupabaseProdutos = () => {
   const fetchProdutos = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('produtos')
-        .select(`
-          *,
-          subcategoria:categorias(id, nome)
-        `)
-        .order('nome', { ascending: true });
+      
+      // Supabase tem limite padrão de 1000 registros
+      // Vamos buscar em lotes para garantir que pegamos todos
+      let allProdutos: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('produtos')
+          .select(`
+            *,
+            subcategoria:categorias(id, nome)
+          `)
+          .order('nome', { ascending: true })
+          .range(from, from + pageSize - 1);
 
-      if (error) throw error;
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allProdutos = [...allProdutos, ...data];
+          from += pageSize;
+          // Se retornou menos que o pageSize, não há mais registros
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
-      const produtosFormatados = (data || []).map((p: any) => ({
+      const produtosFormatados = allProdutos.map((p: any) => ({
         id: p.id,
         codigo: p.codigo,
         nome: p.nome,
         preco: parseFloat(p.preco),
+        preco_varejo: p.preco_varejo ? parseFloat(p.preco_varejo) : undefined,
         preco_cartao: p.preco_cartao ? parseFloat(p.preco_cartao) : undefined,
         preco_pix: p.preco_pix ? parseFloat(p.preco_pix) : undefined,
         preco_dinheiro: p.preco_dinheiro ? parseFloat(p.preco_dinheiro) : undefined,
         preco_oferta: p.preco_oferta ? parseFloat(p.preco_oferta) : undefined,
         image_url: p.image_url || undefined,
         image_storage_path: p.image_storage_path || undefined,
+        marca: p.marca || undefined,
+        categoria: p.categoria || undefined,
         subcategoria_id: p.subcategoria_id,
         subcategoria: p.subcategoria,
         created_at: p.created_at,
