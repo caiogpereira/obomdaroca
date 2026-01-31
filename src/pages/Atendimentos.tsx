@@ -7,17 +7,6 @@ import { PedidosTable } from '../components/PedidosTable';
 import { AtendimentosQueue } from '../components/AtendimentosQueue';
 import { PedidoModal } from '../components/PedidoModal';
 
-// Componente de badge de notificação
-const NotificationBadge = ({ count }: { count: number }) => {
-  if (count === 0) return null;
-  
-  return (
-    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 animate-pulse">
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-};
-
 interface AtendimentosProps {
   pedidos: Pedido[];
   produtos: Produto[];
@@ -121,14 +110,13 @@ export const Atendimentos = ({
               </button>
               <button
                 onClick={() => setShowSection('atendimentos')}
-                className={`relative px-4 py-2 rounded-md transition-all font-medium ${
+                className={`px-4 py-2 rounded-md transition-all font-medium ${
                   showSection === 'atendimentos'
                     ? 'bg-red-600 text-white shadow'
                     : 'text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 Aguardando Atendimento
-                <NotificationBadge count={atendimentos.filter(a => a.status === 'Aguardando').length} />
               </button>
             </div>
           </div>

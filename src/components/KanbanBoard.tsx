@@ -20,7 +20,6 @@ export const KanbanBoard = ({
   const columns: { status: Pedido['status']; label: string; color: string }[] = [
     { status: 'Novo', label: 'Novo Pedido', color: 'bg-red-100 border-red-300' },
     { status: 'Em Atendimento', label: 'Em Atendimento', color: 'bg-orange-100 border-orange-300' },
-    { status: 'Pedido Separado', label: 'Pedido Separado', color: 'bg-blue-100 border-blue-300' },
     { status: 'Finalizado', label: 'Finalizado', color: 'bg-green-100 border-green-300' },
   ];
 
@@ -47,26 +46,26 @@ export const KanbanBoard = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {columns.map((column) => {
         const columnPedidos = getPedidosByStatus(column.status);
         return (
           <div key={column.status} className="flex flex-col">
             <div className={`${column.color} border-2 rounded-t-lg p-3 flex items-center justify-between`}>
-              <h3 className="font-semibold text-gray-800 text-sm">{column.label}</h3>
+              <h3 className="font-semibold text-gray-800">{column.label}</h3>
               <span className="bg-white px-2 py-1 rounded-full text-xs font-bold text-gray-700">
                 {columnPedidos.length}
               </span>
             </div>
             <div
-              className="bg-gray-50 border-2 border-t-0 border-gray-200 rounded-b-lg p-3 min-h-[400px] space-y-3 overflow-y-auto max-h-[600px]"
+              className="bg-gray-50 border-2 border-t-0 border-gray-200 rounded-b-lg p-4 min-h-[500px] space-y-4"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, column.status)}
             >
               {columnPedidos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <Package className="w-10 h-10 text-gray-300 mb-2" />
-                  <p className="text-xs text-gray-500">Nenhum pedido</p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Package className="w-12 h-12 text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-500">Nenhum pedido</p>
                 </div>
               ) : (
                 columnPedidos.map((pedido) => (

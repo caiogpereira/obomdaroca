@@ -19,7 +19,7 @@ export const Catalogo = () => {
   const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutModalidade, setCheckoutModalidade] = useState<ModalidadePagamento>('varejo');
-  const [whatsappLoja, setWhatsappLoja] = useState('5511996250527');
+  const [whatsappLoja, setWhatsappLoja] = useState('553599731201');
   const [loading, setLoading] = useState(true);
   const [salvandoPedido, setSalvandoPedido] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -168,27 +168,12 @@ export const Catalogo = () => {
     setShowCheckout(true);
   };
 
-  const handleConfirmCheckout = async (dados: { 
-    nome: string; 
-    nomeEmpresa: string;
-    cpfCnpj: string;
-    telefone: string; 
-    email: string;
-    cep: string;
-    endereco: string; 
-    modalidade: ModalidadePagamento; 
-    total: number; 
-    observacoes?: string 
-  }) => {
+  const handleConfirmCheckout = async (dados: { nome: string; telefone: string; endereco: string; modalidade: ModalidadePagamento; total: number; observacoes?: string }) => {
     setSalvandoPedido(true);
 
     const resultado = await criarPedidoCatalogo({
       nome: dados.nome,
-      nomeEmpresa: dados.nomeEmpresa,
-      cpfCnpj: dados.cpfCnpj,
       telefone: dados.telefone,
-      email: dados.email,
-      cep: dados.cep,
       endereco: dados.endereco,
       modalidade: dados.modalidade,
       observacoes: dados.observacoes,
@@ -220,27 +205,11 @@ export const Catalogo = () => {
       ? `*Pedido:* ${resultado.numeroPedido}\n`
       : '';
 
-    const empresaTexto = dados.nomeEmpresa
-      ? `*Empresa:* ${dados.nomeEmpresa}\n`
-      : '';
-
-    const cpfCnpjTexto = dados.cpfCnpj
-      ? `*CPF/CNPJ:* ${dados.cpfCnpj}\n`
-      : '';
-
-    const emailTexto = dados.email
-      ? `*Email:* ${dados.email}\n`
-      : '';
-
-    const cepTexto = dados.cep
-      ? `*CEP:* ${dados.cep}\n`
-      : '';
-
     const observacoesTexto = dados.observacoes
       ? `\n*Observações:* ${dados.observacoes}\n`
       : '';
 
-    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n${empresaTexto}${cpfCnpjTexto}*Telefone:* ${dados.telefone}\n${emailTexto}${cepTexto}*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
+    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n*Telefone:* ${dados.telefone}\n*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
       .map(
         (item) => {
           const precoUnit = getPrecoByModalidade(item.produto, dados.modalidade);

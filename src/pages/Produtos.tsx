@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Search, Plus, Upload, Edit, Trash2, Package, FolderKanban, CheckSquare, Square } from 'lucide-react';
+import { Search, Plus, Upload, Edit, Trash2, Package, FolderKanban, CheckSquare, Square, RefreshCw } from 'lucide-react';
 import { Produto, Categoria } from '../types';
 import { FileUpload } from '../components/FileUpload';
 import { ProdutoModal } from '../components/ProdutoModal';
 import { CategoriaModal } from '../components/CategoriaModal';
+import { ImportarProdutosSaurus } from '../components/ImportarProdutosSaurus';
+
+// URL do webhook N8N para importação do Saurus
+// IMPORTANTE: Altere esta URL para a URL real do seu N8N
+const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_SAURUS || 'https://meueditor.manager01.exponensialab.com.br/webhook/importar-produtos-saurus';
 
 interface ProdutosProps {
   produtos: Produto[];
@@ -32,6 +37,7 @@ export const Produtos = ({
 }: ProdutosProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showUpload, setShowUpload] = useState(false);
+  const [showSaurusImport, setShowSaurusImport] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCategoriaModal, setShowCategoriaModal] = useState(false);
   const [selectedProduto, setSelectedProduto] = useState<Produto | undefined>(undefined);
@@ -142,6 +148,14 @@ export const Produtos = ({
                 >
                   <FolderKanban className="w-5 h-5" />
                   Gerenciar Categorias
+                </button>
+                <button
+                  onClick={() => setShowSaurusImport(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium border border-green-300"
+                  title="Importar produtos do Saurus PDV"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  Sincronizar Saurus
                 </button>
                 <button
                   onClick={() => setShowUpload(true)}
@@ -344,6 +358,13 @@ export const Produtos = ({
         <FileUpload
           onProductsImported={onImportProdutos}
           onClose={() => setShowUpload(false)}
+        />
+      )}
+
+      {showSaurusImport && (
+        <ImportarProdutosSaurus
+          webhookUrl={N8N_WEBHOOK_URL}
+          onClose={() => setShowSaurusImport(false)}
         />
       )}
 

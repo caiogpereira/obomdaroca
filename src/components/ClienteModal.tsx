@@ -6,7 +6,6 @@ import {
   ChevronDown, ChevronUp
 } from 'lucide-react';
 import { ClienteComHistorico, ClienteFormData, SegmentoCliente } from '../types';
-import { ToggleAgenteIA } from './ToggleAgenteIA';
 
 const SEGMENTOS_CONFIG: Record<SegmentoCliente, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
   vip: { label: 'VIP', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: Star },
@@ -327,15 +326,6 @@ export const ClienteModal = ({ cliente, isNew, onClose, onSave, onDelete }: Clie
             </div>
           ) : cliente ? (
             <div className="space-y-6">
-              {/* Toggle Agente IA */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <ToggleAgenteIA 
-                  telefone={cliente.telefone} 
-                  clienteNome={cliente.nome}
-                  compact={false}
-                />
-              </div>
-
               {/* Métricas */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-green-50 rounded-lg p-4">

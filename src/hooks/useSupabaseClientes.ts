@@ -4,7 +4,6 @@ import { Cliente, ClienteFormData, ProdutoTopCliente, Pedido } from '../types';
 
 export const useSupabaseClientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [todosClientes, setTodosClientes] = useState<Cliente[]>([]); // Lista completa para estatísticas
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,14 +17,11 @@ export const useSupabaseClientes = () => {
 
       if (fetchError) throw fetchError;
 
-      const clientesFormatados = data?.map(c => ({
+      setClientes(data?.map(c => ({
         ...c,
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
-      })) || [];
-
-      setClientes(clientesFormatados);
-      setTodosClientes(clientesFormatados); // Atualiza lista completa também
+      })) || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar clientes');
@@ -160,7 +156,6 @@ export const useSupabaseClientes = () => {
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
       })) || []);
-      // NÃO atualiza todosClientes aqui para manter estatísticas
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao buscar clientes');
     }
@@ -185,7 +180,6 @@ export const useSupabaseClientes = () => {
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
       })) || []);
-      // NÃO atualiza todosClientes aqui para manter estatísticas
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao filtrar clientes');
     } finally {
@@ -241,23 +235,21 @@ export const useSupabaseClientes = () => {
       if (deleteError) throw deleteError;
 
       setClientes((prev) => prev.filter((c) => c.id !== id));
-      setTodosClientes((prev) => prev.filter((c) => c.id !== id)); // Atualiza lista completa também
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao excluir cliente');
     }
   };
 
-  // Usa todosClientes para estatísticas (números fixos)
   const getEstatisticas = () => {
-    const total = todosClientes.length;
-    const vip = todosClientes.filter(c => c.segmento === 'vip').length;
-    const frequente = todosClientes.filter(c => c.segmento === 'frequente').length;
-    const ativo = todosClientes.filter(c => c.segmento === 'ativo').length;
-    const inativo = todosClientes.filter(c => c.segmento === 'inativo').length;
-    const novo = todosClientes.filter(c => c.segmento === 'novo').length;
+    const total = clientes.length;
+    const vip = clientes.filter(c => c.segmento === 'vip').length;
+    const frequente = clientes.filter(c => c.segmento === 'frequente').length;
+    const ativo = clientes.filter(c => c.segmento === 'ativo').length;
+    const inativo = clientes.filter(c => c.segmento === 'inativo').length;
+    const novo = clientes.filter(c => c.segmento === 'novo').length;
     
-    const totalGasto = todosClientes.reduce((acc, c) => acc + c.total_gasto, 0);
-    const totalPedidos = todosClientes.reduce((acc, c) => acc + c.total_pedidos, 0);
+    const totalGasto = clientes.reduce((acc, c) => acc + c.total_gasto, 0);
+    const totalPedidos = clientes.reduce((acc, c) => acc + c.total_pedidos, 0);
     
     return {
       total,
