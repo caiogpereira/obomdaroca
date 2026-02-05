@@ -175,7 +175,9 @@ export const Catalogo = () => {
     telefone: string; 
     email: string;
     cep: string;
-    endereco: string; 
+    endereco: string;
+    cidade: string;
+    estado: string;
     modalidade: ModalidadePagamento; 
     total: number; 
     observacoes?: string 
@@ -190,6 +192,8 @@ export const Catalogo = () => {
       email: dados.email,
       cep: dados.cep,
       endereco: dados.endereco,
+      cidade: dados.cidade,
+      estado: dados.estado,
       modalidade: dados.modalidade,
       observacoes: dados.observacoes,
       items: carrinho,
@@ -240,7 +244,14 @@ export const Catalogo = () => {
       ? `\n*Observações:* ${dados.observacoes}\n`
       : '';
 
-    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n${empresaTexto}${cpfCnpjTexto}*Telefone:* ${dados.telefone}\n${emailTexto}${cepTexto}*Endereço:* ${dados.endereco}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
+    // Monta endereço completo para exibição no WhatsApp
+    const enderecoCompleto = [
+      dados.endereco,
+      dados.cidade,
+      dados.estado
+    ].filter(Boolean).join(' - ');
+
+    const mensagem = `*Novo Pedido - O Bom da Roça*\n\n${numeroPedidoTexto}*Cliente:* ${dados.nome}\n${empresaTexto}${cpfCnpjTexto}*Telefone:* ${dados.telefone}\n${emailTexto}${cepTexto}*Endereço:* ${enderecoCompleto}${observacoesTexto}\n*Forma de Pagamento:* ${modalidadeLabel[dados.modalidade]}\n\n*Itens:*\n${carrinho
       .map(
         (item) => {
           const precoUnit = getPrecoByModalidade(item.produto, dados.modalidade);

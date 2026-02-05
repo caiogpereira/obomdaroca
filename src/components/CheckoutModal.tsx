@@ -15,7 +15,9 @@ interface CheckoutModalProps {
     telefone: string; 
     email: string;
     cep: string;
-    endereco: string; 
+    endereco: string;
+    cidade: string;
+    estado: string;
     modalidade: ModalidadePagamento; 
     total: number; 
     observacoes?: string 
@@ -117,6 +119,37 @@ const validarCnpj = (cnpj: string): boolean => {
   return dig2 === parseInt(numeros[13]);
 };
 
+// Lista de estados brasileiros
+const ESTADOS_BRASIL = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' },
+];
+
 export const CheckoutModal = ({
   items,
   modalidade,
@@ -131,11 +164,46 @@ export const CheckoutModal = ({
     email: '',
     cep: '',
     endereco: '',
+    cidade: '',
+    estado: '',
     observacoes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const [clienteEncontrado, setClienteEncontrado] = useState(false);
+
+  // Buscar endereço pelo CEP
+  const buscarEnderecoPorCep = async (cep: string) => {
+    const cepNumeros = cep.replace(/\D/g, '');
+    if (cepNumeros.length !== 8) return;
+
+    setBuscandoCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepNumeros}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          endereco: data.logradouro ? `${data.logradouro}${data.bairro ? ', ' + data.bairro : ''}` : prev.endereco,
+          cidade: data.localidade || prev.cidade,
+          estado: data.uf || prev.estado,
+        }));
+        // Limpa erros de endereço se foram preenchidos
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          if (data.localidade) delete newErrors.cidade;
+          if (data.uf) delete newErrors.estado;
+          return newErrors;
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar CEP:', err);
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
 
   // Buscar cliente por CPF/CNPJ
   const buscarClientePorCpfCnpj = async (cpfCnpj: string) => {
@@ -159,6 +227,8 @@ export const CheckoutModal = ({
           email: data.email || prev.email,
           cep: data.cep || prev.cep,
           endereco: data.endereco || prev.endereco,
+          cidade: data.cidade || prev.cidade,
+          estado: data.estado || prev.estado,
         }));
         setClienteEncontrado(true);
       } else {
@@ -216,6 +286,14 @@ export const CheckoutModal = ({
       newErrors.endereco = 'Endereço é obrigatório';
     }
 
+    if (!formData.cidade.trim()) {
+      newErrors.cidade = 'Cidade é obrigatória';
+    }
+
+    if (!formData.estado) {
+      newErrors.estado = 'Estado é obrigatório';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -239,6 +317,8 @@ export const CheckoutModal = ({
         email: formData.email.trim().toLowerCase(),
         cep: formData.cep.replace(/\D/g, ''),
         endereco: toTitleCase(formData.endereco.trim()),
+        cidade: toTitleCase(formData.cidade.trim()),
+        estado: formData.estado.toUpperCase(),
         observacoes: formData.observacoes.trim() || undefined,
         modalidade,
         total: calcularTotal(),
@@ -411,42 +491,86 @@ export const CheckoutModal = ({
               </div>
             </div>
 
+            {/* CEP com busca automática */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   CEP *
                 </label>
-                <input
-                  type="text"
-                  value={formData.cep}
-                  onChange={(e) => {
-                    const formatted = formatarCep(e.target.value);
-                    setFormData({ ...formData, cep: formatted });
-                  }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                    errors.cep ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="00000-000"
-                  maxLength={9}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.cep}
+                    onChange={(e) => {
+                      const formatted = formatarCep(e.target.value);
+                      setFormData({ ...formData, cep: formatted });
+                    }}
+                    onBlur={() => buscarEnderecoPorCep(formData.cep)}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                      errors.cep ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {buscandoCep && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                  )}
+                </div>
                 {errors.cep && <p className="mt-1 text-sm text-red-600">{errors.cep}</p>}
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Endereço Completo *
+                  Cidade *
                 </label>
                 <input
                   type="text"
-                  value={formData.endereco}
-                  onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                  value={formData.cidade}
+                  onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                   className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                    errors.endereco ? 'border-red-500' : 'border-gray-300'
+                    errors.cidade ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Rua, número, complemento, bairro, cidade - Estado"
+                  placeholder="Sua cidade"
                 />
-                {errors.endereco && <p className="mt-1 text-sm text-red-600">{errors.endereco}</p>}
+                {errors.cidade && <p className="mt-1 text-sm text-red-600">{errors.cidade}</p>}
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estado *
+                </label>
+                <select
+                  value={formData.estado}
+                  onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                    errors.estado ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Selecione</option>
+                  {ESTADOS_BRASIL.map((estado) => (
+                    <option key={estado.sigla} value={estado.sigla}>
+                      {estado.sigla}
+                    </option>
+                  ))}
+                </select>
+                {errors.estado && <p className="mt-1 text-sm text-red-600">{errors.estado}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Endereço (Rua, número, complemento, bairro) *
+              </label>
+              <input
+                type="text"
+                value={formData.endereco}
+                onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  errors.endereco ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Rua, número, complemento, bairro"
+              />
+              {errors.endereco && <p className="mt-1 text-sm text-red-600">{errors.endereco}</p>}
             </div>
 
             <div>
