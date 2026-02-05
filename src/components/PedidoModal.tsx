@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Phone, Mail, MapPin, Building2, CreditCard, User, FileText } from 'lucide-react';
 import { Pedido, ItemPedido, Produto } from '../types';
 import { SearchableProductSelect } from './SearchableProductSelect';
 
@@ -96,6 +96,56 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
     onClose();
   };
 
+  // Formatar telefone para exibição
+  const formatarTelefone = (telefone: string) => {
+    const numeros = telefone.replace(/\D/g, '');
+    if (numeros.length === 13) {
+      return `+${numeros.slice(0, 2)} (${numeros.slice(2, 4)}) ${numeros.slice(4, 9)}-${numeros.slice(9)}`;
+    }
+    if (numeros.length === 12) {
+      return `+${numeros.slice(0, 2)} (${numeros.slice(2, 4)}) ${numeros.slice(4, 8)}-${numeros.slice(8)}`;
+    }
+    if (numeros.length === 11) {
+      return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
+    }
+    if (numeros.length === 10) {
+      return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`;
+    }
+    return telefone;
+  };
+
+  // Formatar CPF/CNPJ para exibição
+  const formatarCpfCnpj = (valor: string) => {
+    if (!valor) return '-';
+    const numeros = valor.replace(/\D/g, '');
+    if (numeros.length === 11) {
+      return `${numeros.slice(0, 3)}.${numeros.slice(3, 6)}.${numeros.slice(6, 9)}-${numeros.slice(9)}`;
+    }
+    if (numeros.length === 14) {
+      return `${numeros.slice(0, 2)}.${numeros.slice(2, 5)}.${numeros.slice(5, 8)}/${numeros.slice(8, 12)}-${numeros.slice(12)}`;
+    }
+    return valor;
+  };
+
+  // Formatar CEP para exibição
+  const formatarCep = (cep: string) => {
+    if (!cep) return '';
+    const numeros = cep.replace(/\D/g, '');
+    if (numeros.length === 8) {
+      return `${numeros.slice(0, 5)}-${numeros.slice(5)}`;
+    }
+    return cep;
+  };
+
+  // Montar endereço completo
+  const montarEnderecoCompleto = () => {
+    const partes = [];
+    if (editedPedido.endereco) partes.push(editedPedido.endereco);
+    if ((editedPedido as any).cidade) partes.push((editedPedido as any).cidade);
+    if ((editedPedido as any).estado) partes.push((editedPedido as any).estado);
+    return partes.join(' - ') || '-';
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn"
@@ -117,57 +167,152 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
         </div>
 
         <div className="p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Dados do Cliente</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-                <input
-                  type="text"
-                  value={editedPedido.cliente}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-                <input
-                  type="text"
-                  value={editedPedido.nome_empresa || '-'}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                <input
-                  type="text"
-                  value={editedPedido.telefone}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={editedPedido.email || ''}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
-                <input
-                  type="text"
-                  value={editedPedido.forma_pagamento || '-'}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 font-medium"
-                />
+          {/* Dados do Cliente - Formato Texto */}
+          {isViewMode ? (
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Dados do Cliente
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                {/* Coluna 1 */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <User className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-xs text-gray-500">Cliente:</span>
+                      <p className="text-sm font-medium text-gray-900">{editedPedido.cliente}</p>
+                    </div>
+                  </div>
+                  
+                  {editedPedido.nome_empresa && (
+                    <div className="flex items-start gap-2">
+                      <Building2 className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-500">Empresa:</span>
+                        <p className="text-sm font-medium text-gray-900">{editedPedido.nome_empresa}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {editedPedido.cpf_cnpj && (
+                    <div className="flex items-start gap-2">
+                      <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-500">CPF/CNPJ:</span>
+                        <p className="text-sm font-medium text-gray-900">{formatarCpfCnpj(editedPedido.cpf_cnpj)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-start gap-2">
+                    <Phone className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-xs text-gray-500">Telefone:</span>
+                      <p className="text-sm font-medium text-gray-900">{formatarTelefone(editedPedido.telefone)}</p>
+                    </div>
+                  </div>
+                  
+                  {editedPedido.email && (
+                    <div className="flex items-start gap-2">
+                      <Mail className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-500">Email:</span>
+                        <p className="text-sm font-medium text-gray-900">{editedPedido.email}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Coluna 2 */}
+                <div className="space-y-2">
+                  {editedPedido.cep && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-xs text-gray-500">CEP:</span>
+                        <p className="text-sm font-medium text-gray-900">{formatarCep(editedPedido.cep)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-xs text-gray-500">Endereço:</span>
+                      <p className="text-sm font-medium text-gray-900">{montarEnderecoCompleto()}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <CreditCard className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-xs text-gray-500">Forma de Pagamento:</span>
+                      <p className="text-sm font-medium text-gray-900">{editedPedido.forma_pagamento || '-'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Modo Edição - mantém os inputs */
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Dados do Cliente</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                  <input
+                    type="text"
+                    value={editedPedido.cliente}
+                    onChange={(e) => setEditedPedido({ ...editedPedido, cliente: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                  <input
+                    type="text"
+                    value={editedPedido.nome_empresa || ''}
+                    onChange={(e) => setEditedPedido({ ...editedPedido, nome_empresa: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                  <input
+                    type="text"
+                    value={editedPedido.telefone}
+                    onChange={(e) => setEditedPedido({ ...editedPedido, telefone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editedPedido.email || ''}
+                    onChange={(e) => setEditedPedido({ ...editedPedido, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                  <select
+                    value={editedPedido.forma_pagamento || ''}
+                    onChange={(e) => setEditedPedido({ ...editedPedido, forma_pagamento: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Varejo">Varejo</option>
+                    <option value="Cartão">Cartão</option>
+                    <option value="PIX">PIX</option>
+                    <option value="TED/Dinheiro">TED/Dinheiro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
 
+          {/* Itens do Pedido */}
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Itens do Pedido</h3>
@@ -195,16 +340,16 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
                     {!isViewMode && <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700"></th>}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-200">
                   {editedPedido.itens.map((item, index) => (
-                    <tr key={item.id} className="border-t border-gray-200">
+                    <tr key={item.id || index} className="hover:bg-gray-50">
                       <td className="py-3 px-4">
                         {isViewMode ? (
                           <span className="text-sm text-gray-900">{item.produto_nome}</span>
                         ) : (
                           <SearchableProductSelect
                             produtos={produtos}
-                            value={item.produto_nome}
+                            value={item.produto_id}
                             onChange={(produto) => handleProductSelect(index, produto)}
                             placeholder="Buscar produto..."
                           />
@@ -305,18 +450,26 @@ export const PedidoModal = ({ pedido, produtos, mode, onClose, onSave, onFinaliz
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-            <textarea
-              value={editedPedido.observacoes}
-              onChange={(e) => setEditedPedido({ ...editedPedido, observacoes: e.target.value })}
-              disabled={isViewMode}
-              rows={3}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                isViewMode ? 'bg-gray-50 text-gray-900' : ''
-              }`}
-            />
-          </div>
+          {/* Observações */}
+          {(editedPedido.observacoes || !isViewMode) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+              {isViewMode ? (
+                editedPedido.observacoes && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-gray-700">
+                    {editedPedido.observacoes}
+                  </div>
+                )
+              ) : (
+                <textarea
+                  value={editedPedido.observacoes}
+                  onChange={(e) => setEditedPedido({ ...editedPedido, observacoes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              )}
+            </div>
+          )}
 
           {/* Histórico de Ações */}
           {editedPedido.historico && editedPedido.historico.length > 0 && (
