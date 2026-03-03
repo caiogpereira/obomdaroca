@@ -12,7 +12,8 @@ export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, user, loading: authLoading } = useAuth();
-// Define o título da página
+
+  // Define o título da página
   useEffect(() => {
     document.title = 'Login - O Bom da Roça';
   }, []);
@@ -47,17 +48,7 @@ export const Login = () => {
       // Navigation will happen automatically via useEffect when user state updates
     } catch (err: any) {
       console.error('Login error:', err);
-      
-      // Handle specific Supabase errors
-      if (err.message?.includes('Invalid login credentials')) {
-        setError('Email ou senha incorretos');
-      } else if (err.message?.includes('Email not confirmed')) {
-        setError('Por favor, confirme seu email antes de fazer login');
-      } else if (err.message?.includes('Too many requests')) {
-        setError('Muitas tentativas. Aguarde alguns minutos e tente novamente');
-      } else {
-        setError('Erro ao entrar. Verifique suas credenciais e tente novamente.');
-      }
+      setError(err.message || 'Erro ao entrar. Verifique suas credenciais e tente novamente.');
     } finally {
       setLoading(false);
     }

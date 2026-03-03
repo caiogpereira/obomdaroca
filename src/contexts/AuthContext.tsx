@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 interface UserProfile {
@@ -12,7 +11,7 @@ interface UserProfile {
 }
 
 interface AuthContextType {
-  user: SupabaseUser | null;
+  user: UserProfile | null;
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -22,70 +21,103 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Chave para armazenar sessão no localStorage
+const SESSION_KEY = 'obdr_user_session';
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  // Carregar sessão do localStorage ao iniciar
+  useEffect(() => {
+    const loadSession = () => {
+      try {
+        const savedSession = localStorage.getItem(SESSION_KEY);
+        if (savedSession) {
+          const userData = JSON.parse(savedSession) as UserProfile;
+          // Verificar se o usuário ainda está ativo no banco
+          verifyUser(userData.id).then((isValid) => {
+            if (isValid) {
+              setUser(userData);
+            } else {
+              localStorage.removeItem(SESSION_KEY);
+            }
+            setLoading(false);
+          });
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading session:', error);
+        localStorage.removeItem(SESSION_KEY);
+        setLoading(false);
+      }
+    };
+
+    loadSession();
+  }, []);
+
+  // Verificar se usuário ainda está ativo
+  const verifyUser = async (userId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, is_active')
         .eq('id', userId)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (error) throw error;
-
-      if (data) {
-        setProfile(data as UserProfile);
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
+      return !error && !!data;
+    } catch {
+      return false;
     }
   };
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    // Chamar função do banco para verificar senha
+    const { data, error } = await supabase.rpc('verify_user_password', {
+      p_email: email.toLowerCase().trim(),
+      p_password: password,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Login error:', error);
+      throw new Error('Erro ao fazer login. Tente novamente.');
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('Email ou senha incorretos');
+    }
+
+    const userData = data[0] as UserProfile;
+
+    if (!userData.is_active) {
+      throw new Error('Usuário desativado. Entre em contato com o administrador.');
+    }
+
+    // Salvar sessão
+    setUser(userData);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(userData));
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setProfile(null);
+    setUser(null);
+    localStorage.removeItem(SESSION_KEY);
   };
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, isAdmin }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        profile: user, // Manter compatibilidade com código existente
+        loading, 
+        signIn, 
+        signOut, 
+        isAdmin 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, UserPlus, Shield, User, Mail, Check, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, UserPlus, Shield, User, Mail, Check, AlertCircle, ToggleLeft, ToggleRight, Key, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
@@ -21,6 +21,10 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [showNewUserForm, setShowNewUserForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [newUser, setNewUser] = useState<NewUserForm>({
     email: '',
     full_name: '',
@@ -61,6 +65,15 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
     }
   };
 
+  const generatePassword = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -83,45 +96,61 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
     setSaving(true);
 
     try {
-      // Create auth user using signUp
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: newUser.email.trim(),
-        password: newUser.password,
-        options: {
-          data: {
-            full_name: newUser.full_name.trim(),
-          },
-        },
-      });
+      // Verificar se email já existe
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', newUser.email.toLowerCase().trim())
+        .maybeSingle();
 
-      if (signUpError) throw signUpError;
-
-      if (signUpData.user) {
-        // Create user profile
-        const { error: profileError } = await supabase.from('users').insert({
-          id: signUpData.user.id,
-          email: newUser.email.trim(),
-          full_name: newUser.full_name.trim(),
-          role: newUser.role,
-          is_active: true,
-        });
-
-        if (profileError) throw profileError;
+      if (existingUser) {
+        setError('Este email já está cadastrado');
+        setSaving(false);
+        return;
       }
 
-      setSuccess('Usuário criado com sucesso! Um email de confirmação foi enviado.');
+      // Criar usuário usando a função do banco
+      const { data, error: createError } = await supabase.rpc('create_user_with_password', {
+        p_email: newUser.email.toLowerCase().trim(),
+        p_full_name: newUser.full_name.trim(),
+        p_password: newUser.password,
+        p_role: newUser.role,
+      });
+
+      if (createError) throw createError;
+
+      setSuccess(`Usuário criado com sucesso! Senha: ${newUser.password}`);
       setNewUser({ email: '', full_name: '', password: '', role: 'employee' });
       setShowNewUserForm(false);
       await fetchUsers();
     } catch (err: any) {
       console.error('Error creating user:', err);
-      if (err.message?.includes('already registered')) {
-        setError('Este email já está registrado');
-      } else {
-        setError(err.message || 'Erro ao criar usuário');
-      }
+      setError(err.message || 'Erro ao criar usuário');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      setError('Nova senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('change_user_password', {
+        p_user_id: userId,
+        p_new_password: newPassword,
+      });
+
+      if (error) throw error;
+
+      setSuccess(`Senha alterada com sucesso! Nova senha: ${newPassword}`);
+      setResetPasswordUserId(null);
+      setNewPassword('');
+    } catch (err: any) {
+      console.error('Error resetting password:', err);
+      setError(err.message || 'Erro ao alterar senha');
     }
   };
 
@@ -212,7 +241,7 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
           {success && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
               <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <span className="text-green-800">{success}</span>
+              <span className="text-green-800 break-all">{success}</span>
             </div>
           )}
 
@@ -257,19 +286,43 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="joao@exemplo.com"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    O email serve apenas como identificador de login
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Senha Inicial *
                   </label>
-                  <input
-                    type="password"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Mínimo 6 caracteres"
-                  />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 pr-10"
+                        placeholder="Mínimo 6 caracteres"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewUser({ ...newUser, password: generatePassword() })}
+                      className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm whitespace-nowrap"
+                    >
+                      Gerar Senha
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Anote a senha para passar ao funcionário
+                  </p>
                 </div>
 
                 <div>
@@ -354,6 +407,18 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Reset Password Button */}
+                      <button
+                        onClick={() => {
+                          setResetPasswordUserId(resetPasswordUserId === user.id ? null : user.id);
+                          setNewPassword('');
+                        }}
+                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Redefinir senha"
+                      >
+                        <Key className="w-5 h-5" />
+                      </button>
+
                       {/* Role Selector */}
                       <select
                         value={user.role}
@@ -382,6 +447,52 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Reset Password Form */}
+                  {resetPasswordUserId === user.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Nova senha (mínimo 6 caracteres)"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNewPassword(generatePassword())}
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                        >
+                          Gerar
+                        </button>
+                        <button
+                          onClick={() => handleResetPassword(user.id)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setResetPasswordUserId(null);
+                            setNewPassword('');
+                          }}
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
