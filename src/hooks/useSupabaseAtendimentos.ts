@@ -1,21 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Atendimento } from '../types';
-
-// POST /api/atendimentos - Criar atendimento (Recebe dados do n8n ou do formulário)
-// Body: { cliente: string, telefone: string, email?: string, tipo_solicitacao: string, descricao: string, status: 'Aguardando' | 'Em Atendimento' | 'Resolvido', prioridade: 'Alta' | 'Normal' | 'Baixa' }
-// Resposta: Atendimento criado
-
-// GET /api/atendimentos - Listar todos os atendimentos
-// Query params: status?: string, prioridade?: string
-// Resposta: Array de objetos Atendimento
-
-// PUT /api/atendimentos/:id - Atualizar atendimento
-// Body: Partial<Atendimento>
-// Resposta: Atendimento atualizado
-
-// DELETE /api/atendimentos/:id - Excluir atendimento
-// Resposta: Status de sucesso
+import { playNotificationSound } from '../utils/notificationSound';
 
 export const useSupabaseAtendimentos = (onNewAtendimento?: (atendimento: Atendimento) => void) => {
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([]);
@@ -147,6 +133,10 @@ export const useSupabaseAtendimentos = (onNewAtendimento?: (atendimento: Atendim
             is_read: false,
           };
 
+          // Tocar som de notificação
+          console.log('🔔 Novo atendimento recebido via Realtime');
+          playNotificationSound('new_atendimento');
+
           setAtendimentos(prev => [atendimentoFormatado, ...prev]);
           setUnreadCount(prev => prev + 1);
 
@@ -177,7 +167,9 @@ export const useSupabaseAtendimentos = (onNewAtendimento?: (atendimento: Atendim
           fetchAtendimentos();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Status do canal Realtime atendimentos:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);

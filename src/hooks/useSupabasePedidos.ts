@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pedido, HistoricoAcao } from '../types';
+import { playNotificationSound } from '../utils/notificationSound';
 
 // Função para obter usuário atual do localStorage (novo sistema de auth)
 const getUsuarioAtual = () => {
@@ -216,8 +217,9 @@ export const useSupabasePedidos = () => {
           table: 'pedidos',
         },
         () => {
-          // Novo pedido inserido - recarrega todos
+          // Novo pedido inserido - recarrega todos e toca som
           console.log('🔔 Novo pedido recebido via Realtime');
+          playNotificationSound('new_order');
           fetchPedidos();
         }
       )
