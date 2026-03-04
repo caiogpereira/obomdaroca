@@ -1,36 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Pedido, HistoricoAcao } from '../types';
 
-// POST /api/atendimentos - Receber dados do n8n
-// Estrutura esperada: { cliente: string, telefone: string, email?: string, tipo_solicitacao: string, descricao: string, status: string, prioridade: string }
-
-// GET /api/metricas?periodo=7d - Buscar métricas
-// Parâmetros: periodo (hoje, ontem, 7dias, semana, mes, personalizado)
-// Resposta: Array de objetos Metric
-
-// GET /api/pedidos-pendentes - Listar pedidos não finalizados
-// Resposta: Array de objetos Pedido com status != 'Finalizado'
-
-// PUT /api/pedidos/:id - Atualizar pedido
-// Body: Pedido completo
-// Resposta: Pedido atualizado
-
-// POST /api/pedidos/:id/finalizar - Finalizar pedido
-// Resposta: Pedido com status = 'Finalizado'
-
-// Função para obter usuário atual
-const getUsuarioAtual = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('id, full_name')
-    .eq('id', user.id)
-    .single();
-  
-  return profile ? { id: profile.id, nome: profile.full_name } : { id: user.id, nome: user.email || 'Sistema' };
+// Função para obter usuário atual do localStorage (novo sistema de auth)
+const getUsuarioAtual = () => {
+  try {
+    const session = localStorage.getItem('obdr_user_session');
+    if (session) {
+      const user = JSON.parse(session);
+      return { id: user.id, nome: user.full_name };
+    }
+  } catch (e) {
+    console.error('Erro ao obter usuário:', e);
+  }
+  return null;
 };
 
 export const useSupabasePedidos = () => {
@@ -38,7 +21,7 @@ export const useSupabasePedidos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPedidos = async () => {
+  const fetchPedidos = useCallback(async () => {
     try {
       setLoading(true);
       const { data: pedidosData, error: pedidosError } = await supabase
@@ -67,9 +50,13 @@ export const useSupabasePedidos = () => {
             numero_pedido: pedido.numero_pedido,
             cliente: pedido.cliente,
             nome_empresa: pedido.nome_empresa || '',
+            cpf_cnpj: pedido.cpf_cnpj || '',
             telefone: pedido.telefone,
             email: pedido.email || '',
+            cep: pedido.cep || '',
             endereco: pedido.endereco || '',
+            cidade: pedido.cidade || '',
+            estado: pedido.estado || '',
             valor_total: parseFloat(pedido.valor_total),
             status: pedido.status as Pedido['status'],
             observacoes: pedido.observacoes || '',
@@ -102,11 +89,11 @@ export const useSupabasePedidos = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const atualizarStatusPedido = async (pedidoId: string, newStatus: Pedido['status']) => {
     try {
-      const usuario = await getUsuarioAtual();
+      const usuario = getUsuarioAtual();
       const pedidoAtual = pedidos.find(p => p.id === pedidoId);
       const statusAnterior = pedidoAtual?.status;
       
@@ -137,6 +124,7 @@ export const useSupabasePedidos = () => {
           });
       }
 
+      // Atualização local imediata (otimista)
       setPedidos((prev) =>
         prev.map((p) =>
           p.id === pedidoId ? { 
@@ -159,7 +147,7 @@ export const useSupabasePedidos = () => {
 
   const atualizarPedido = async (pedidoAtualizado: Pedido) => {
     try {
-      const usuario = await getUsuarioAtual();
+      const usuario = getUsuarioAtual();
       
       const { error: pedidoError } = await supabase
         .from('pedidos')
@@ -214,8 +202,61 @@ export const useSupabasePedidos = () => {
   };
 
   useEffect(() => {
+    // Busca inicial
     fetchPedidos();
-  }, []);
+
+    // Configurar Realtime para sincronização automática
+    const channel = supabase
+      .channel('pedidos_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'pedidos',
+        },
+        () => {
+          // Novo pedido inserido - recarrega todos
+          console.log('🔔 Novo pedido recebido via Realtime');
+          fetchPedidos();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pedidos',
+        },
+        () => {
+          // Pedido atualizado - recarrega todos
+          console.log('🔄 Pedido atualizado via Realtime');
+          fetchPedidos();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'pedidos',
+        },
+        () => {
+          // Pedido deletado - recarrega todos
+          console.log('🗑️ Pedido removido via Realtime');
+          fetchPedidos();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Status do canal Realtime pedidos:', status);
+      });
+
+    // Cleanup ao desmontar
+    return () => {
+      console.log('🔌 Desconectando canal Realtime pedidos');
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPedidos]);
 
   return {
     pedidos,
