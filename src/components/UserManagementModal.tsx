@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, UserPlus, Shield, User, Mail, Check, AlertCircle, ToggleLeft, ToggleRight, Key, Eye, EyeOff } from 'lucide-react';
+import { X, UserPlus, Shield, User, Mail, Check, AlertCircle, ToggleLeft, ToggleRight, Key, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserManagementModalProps {
   onClose: () => void;
@@ -15,6 +16,7 @@ interface NewUserForm {
 }
 
 export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [deleteConfirmUserId, setDeleteConfirmUserId] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<NewUserForm>({
     email: '',
     full_name: '',
@@ -170,6 +173,32 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
     } catch (err) {
       console.error('Error toggling user status:', err);
       setError('Erro ao alterar status do usuário');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    // Não permitir excluir a si mesmo
+    if (currentUser?.id === userId) {
+      setError('Você não pode excluir seu próprio usuário');
+      setDeleteConfirmUserId(null);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setUsers(users.filter(u => u.id !== userId));
+      setSuccess('Usuário excluído com sucesso');
+      setDeleteConfirmUserId(null);
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      setError(err.message || 'Erro ao excluir usuário');
+      setDeleteConfirmUserId(null);
     }
   };
 
@@ -388,7 +417,7 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                         <User className={`w-5 h-5 ${user.is_active ? 'text-gray-600' : 'text-gray-400'}`} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-medium ${user.is_active ? 'text-gray-900' : 'text-gray-500'}`}>
                             {user.full_name}
                           </span>
@@ -396,6 +425,11 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                           {!user.is_active && (
                             <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">
                               Desativado
+                            </span>
+                          )}
+                          {currentUser?.id === user.id && (
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                              Você
                             </span>
                           )}
                         </div>
@@ -412,6 +446,7 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                         onClick={() => {
                           setResetPasswordUserId(resetPasswordUserId === user.id ? null : user.id);
                           setNewPassword('');
+                          setDeleteConfirmUserId(null);
                         }}
                         className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                         title="Redefinir senha"
@@ -445,6 +480,20 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                           <ToggleLeft className="w-6 h-6" />
                         )}
                       </button>
+
+                      {/* Delete Button */}
+                      {currentUser?.id !== user.id && (
+                        <button
+                          onClick={() => {
+                            setDeleteConfirmUserId(deleteConfirmUserId === user.id ? null : user.id);
+                            setResetPasswordUserId(null);
+                          }}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -487,6 +536,29 @@ export const UserManagementModal = ({ onClose }: UserManagementModalProps) => {
                             setNewPassword('');
                           }}
                           className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delete Confirmation */}
+                  {deleteConfirmUserId === user.id && (
+                    <div className="mt-3 pt-3 border-t border-red-200 bg-red-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+                      <p className="text-sm text-red-800 mb-3">
+                        Tem certeza que deseja excluir <strong>{user.full_name}</strong>? Esta ação não pode ser desfeita.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          Sim, Excluir
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmUserId(null)}
+                          className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                         >
                           Cancelar
                         </button>
