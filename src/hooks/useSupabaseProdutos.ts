@@ -2,19 +2,19 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Produto, Categoria } from '../types';
 
-// GET /api/produtos - Listar todos os produtos
-// Resposta: Array de objetos Produto com subcategoria populated
-
-// POST /api/produtos - Criar produto
-// Body: { codigo: string, nome: string, preco: number, subcategoria_id?: string }
-// Resposta: Produto criado
-
-// PUT /api/produtos/:id - Atualizar produto
-// Body: { codigo: string, nome: string, preco: number, subcategoria_id?: string }
-// Resposta: Produto atualizado
-
-// DELETE /api/produtos/:id - Excluir produto
-// Resposta: Status de sucesso
+// Helper para obter ID do admin logado
+const getAdminUserId = (): string => {
+  try {
+    const session = localStorage.getItem('obdr_user_session');
+    if (session) {
+      const user = JSON.parse(session);
+      return user.id;
+    }
+  } catch (e) {
+    console.error('Erro ao obter usuário:', e);
+  }
+  throw new Error('Usuário não autenticado. Faça login novamente.');
+};
 
 export const useSupabaseProdutos = () => {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -40,8 +40,6 @@ export const useSupabaseProdutos = () => {
     try {
       setLoading(true);
       
-      // Supabase tem limite padrão de 1000 registros
-      // Vamos buscar em lotes para garantir que pegamos todos
       let allProdutos: any[] = [];
       let from = 0;
       const pageSize = 1000;
@@ -62,7 +60,6 @@ export const useSupabaseProdutos = () => {
         if (data && data.length > 0) {
           allProdutos = [...allProdutos, ...data];
           from += pageSize;
-          // Se retornou menos que o pageSize, não há mais registros
           hasMore = data.length === pageSize;
         } else {
           hasMore = false;
@@ -100,6 +97,7 @@ export const useSupabaseProdutos = () => {
 
   const addProduto = async (produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      const adminUserId = getAdminUserId();
       let subcategoria_id = produto.subcategoria_id?.trim() || null;
 
       if (subcategoria_id) {
@@ -110,11 +108,11 @@ export const useSupabaseProdutos = () => {
         if (existingCategory) {
           subcategoria_id = existingCategory.id;
         } else {
-          const { data: newCat, error: catError } = await supabase
-            .from('categorias')
-            .insert({ nome: subcategoria_id })
-            .select()
-            .maybeSingle();
+          // Criar categoria via RPC
+          const { data: newCat, error: catError } = await supabase.rpc('admin_create_categoria', {
+            p_admin_user_id: adminUserId,
+            p_nome: subcategoria_id
+          });
 
           if (catError) throw catError;
           if (newCat) {
@@ -126,21 +124,27 @@ export const useSupabaseProdutos = () => {
         }
       }
 
-      const { error } = await supabase.from('produtos').insert({
-        codigo: produto.codigo.trim(),
-        nome: produto.nome.trim(),
-        preco: produto.preco,
-        preco_cartao: produto.preco_cartao || null,
-        preco_pix: produto.preco_pix || null,
-        preco_dinheiro: produto.preco_dinheiro || null,
-        preco_oferta: produto.preco_oferta || null,
-        image_url: produto.image_url || null,
-        image_storage_path: produto.image_storage_path || null,
-        subcategoria_id,
+      // Criar produto via RPC
+      const { error } = await supabase.rpc('admin_upsert_produto', {
+        p_admin_user_id: adminUserId,
+        p_produto: {
+          codigo: produto.codigo.trim(),
+          nome: produto.nome.trim(),
+          preco: produto.preco,
+          preco_varejo: produto.preco_varejo || null,
+          preco_cartao: produto.preco_cartao || null,
+          preco_pix: produto.preco_pix || null,
+          preco_dinheiro: produto.preco_dinheiro || null,
+          preco_oferta: produto.preco_oferta || null,
+          image_url: produto.image_url || null,
+          image_storage_path: produto.image_storage_path || null,
+          subcategoria_id,
+          ativo: true,
+        }
       });
 
       if (error) {
-        if (error.code === '23505') {
+        if (error.message?.includes('23505') || error.message?.includes('duplicate')) {
           throw new Error('Já existe um produto com este código');
         }
         throw error;
@@ -156,6 +160,7 @@ export const useSupabaseProdutos = () => {
     produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>
   ) => {
     try {
+      const adminUserId = getAdminUserId();
       let subcategoria_id = produto.subcategoria_id || null;
 
       if (subcategoria_id) {
@@ -166,11 +171,11 @@ export const useSupabaseProdutos = () => {
         if (existingCategory) {
           subcategoria_id = existingCategory.id;
         } else {
-          const { data: newCat, error: catError } = await supabase
-            .from('categorias')
-            .insert({ nome: subcategoria_id })
-            .select()
-            .maybeSingle();
+          // Criar categoria via RPC
+          const { data: newCat, error: catError } = await supabase.rpc('admin_create_categoria', {
+            p_admin_user_id: adminUserId,
+            p_nome: subcategoria_id
+          });
 
           if (catError) throw catError;
           if (newCat) {
@@ -180,12 +185,16 @@ export const useSupabaseProdutos = () => {
         }
       }
 
-      const { error } = await supabase
-        .from('produtos')
-        .update({
+      // Atualizar produto via RPC
+      // preco e preco_varejo devem ser sincronizados (preco_varejo é o exibido no catálogo)
+      const { error } = await supabase.rpc('admin_update_produto', {
+        p_admin_user_id: adminUserId,
+        p_produto_id: id,
+        p_updates: {
           codigo: produto.codigo,
           nome: produto.nome,
           preco: produto.preco,
+          preco_varejo: produto.preco_varejo || produto.preco,
           preco_cartao: produto.preco_cartao || null,
           preco_pix: produto.preco_pix || null,
           preco_dinheiro: produto.preco_dinheiro || null,
@@ -193,9 +202,8 @@ export const useSupabaseProdutos = () => {
           image_url: produto.image_url || null,
           image_storage_path: produto.image_storage_path || null,
           subcategoria_id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
+        }
+      });
 
       if (error) throw error;
       await fetchProdutos();
@@ -206,7 +214,11 @@ export const useSupabaseProdutos = () => {
 
   const deleteProduto = async (id: string) => {
     try {
-      const { error } = await supabase.from('produtos').delete().eq('id', id);
+      const adminUserId = getAdminUserId();
+      const { error } = await supabase.rpc('admin_delete_produto', {
+        p_admin_user_id: adminUserId,
+        p_produto_id: id
+      });
 
       if (error) throw error;
       await fetchProdutos();
@@ -217,9 +229,16 @@ export const useSupabaseProdutos = () => {
 
   const deleteMultipleProdutos = async (ids: string[]) => {
     try {
-      const { error } = await supabase.from('produtos').delete().in('id', ids);
-
-      if (error) throw error;
+      const adminUserId = getAdminUserId();
+      
+      for (const id of ids) {
+        const { error } = await supabase.rpc('admin_delete_produto', {
+          p_admin_user_id: adminUserId,
+          p_produto_id: id
+        });
+        if (error) throw error;
+      }
+      
       await fetchProdutos();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao excluir produtos');
@@ -228,44 +247,33 @@ export const useSupabaseProdutos = () => {
 
   const importProdutos = async (produtos: Omit<Produto, 'id' | 'created_at' | 'updated_at'>[]) => {
     try {
-      const categoriasMap = new Map<string, string>();
+      const adminUserId = getAdminUserId();
 
-      for (const cat of categorias) {
-        categoriasMap.set(cat.nome.toLowerCase(), cat.id);
-      }
-
-      // Process categories first (collect unique categories)
+      // Collect unique categories
       const uniqueCategories = new Set<string>();
-      for (const p of produtos) {
-        if (p.subcategoria_id) {
-          const catName = p.subcategoria_id.toLowerCase();
-          if (!categoriasMap.has(catName)) {
-            uniqueCategories.add(p.subcategoria_id);
-          }
+      produtos.forEach((p) => {
+        if (p.subcategoria_id?.trim()) {
+          uniqueCategories.add(p.subcategoria_id.trim());
         }
-      }
+      });
 
-      // Create new categories (only if they don't exist)
+      // Create a map of category names to IDs
+      const categoriasMap = new Map<string, string>();
+      categorias.forEach((cat) => {
+        categoriasMap.set(cat.nome.toLowerCase(), cat.id);
+      });
+
+      // Create missing categories via RPC
       for (const catName of uniqueCategories) {
-        // Check if category already exists (case-insensitive)
-        const { data: existingCat } = await supabase
-          .from('categorias')
-          .select('id, nome')
-          .ilike('nome', catName)
-          .maybeSingle();
+        if (!categoriasMap.has(catName.toLowerCase())) {
+          const { data: newCat, error: catError } = await supabase.rpc('admin_create_categoria', {
+            p_admin_user_id: adminUserId,
+            p_nome: catName
+          });
 
-        if (existingCat) {
-          // Category already exists, use it
-          categoriasMap.set(catName.toLowerCase(), existingCat.id);
-        } else {
-          // Create new category
-          const { data: newCat } = await supabase
-            .from('categorias')
-            .insert({ nome: catName })
-            .select()
-            .maybeSingle();
-
-          if (newCat) {
+          if (catError) {
+            console.warn(`Erro ao criar categoria ${catName}:`, catError);
+          } else if (newCat) {
             categoriasMap.set(catName.toLowerCase(), newCat.id);
           }
         }
@@ -294,8 +302,7 @@ export const useSupabaseProdutos = () => {
         };
       });
 
-      // Use upsert to handle duplicates gracefully
-      // Insert products in smaller batches for reliability
+      // Import in batches via RPC
       const BATCH_SIZE = 100;
       const batches = [];
 
@@ -312,24 +319,24 @@ export const useSupabaseProdutos = () => {
       for (let i = 0; i < batches.length; i++) {
         console.log(`Processando lote ${i + 1} de ${batches.length} (${batches[i].length} produtos)...`);
 
-        // Use upsert with onConflict to update existing products
-        const { data, error } = await supabase
-          .from('produtos')
-          .upsert(batches[i], {
-            onConflict: 'codigo',
-            ignoreDuplicates: false, // Update existing records
-          })
-          .select('id');
+        const { data, error } = await supabase.rpc('admin_batch_upsert_produtos', {
+          p_admin_user_id: adminUserId,
+          p_produtos: batches[i]
+        });
 
         if (error) {
           console.error(`Erro no lote ${i + 1}:`, error);
           errorCount += batches[i].length;
           errors.push(`Lote ${i + 1}: ${error.message}`);
-        } else {
-          successCount += data?.length || batches[i].length;
+        } else if (data) {
+          successCount += data.success_count || 0;
+          errorCount += data.error_count || 0;
+          if (data.errors && data.errors.length > 0) {
+            errors.push(...data.errors);
+          }
         }
 
-        // Small delay between batches to avoid rate limiting
+        // Small delay between batches
         if (i < batches.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 50));
         }

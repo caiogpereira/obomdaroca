@@ -2,9 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Cliente, ClienteFormData, ProdutoTopCliente, Pedido } from '../types';
 
+// Helper para obter ID do admin logado
+const getAdminUserId = (): string => {
+  try {
+    const session = localStorage.getItem('obdr_user_session');
+    if (session) {
+      const user = JSON.parse(session);
+      return user.id;
+    }
+  } catch (e) {
+    console.error('Erro ao obter usuário:', e);
+  }
+  throw new Error('Usuário não autenticado. Faça login novamente.');
+};
+
 export const useSupabaseClientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [todosClientes, setTodosClientes] = useState<Cliente[]>([]); // Lista completa para estatísticas
+  const [todosClientes, setTodosClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +39,7 @@ export const useSupabaseClientes = () => {
       })) || [];
 
       setClientes(clientesFormatados);
-      setTodosClientes(clientesFormatados); // Atualiza lista completa também
+      setTodosClientes(clientesFormatados);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar clientes');
@@ -160,7 +174,6 @@ export const useSupabaseClientes = () => {
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
       })) || []);
-      // NÃO atualiza todosClientes aqui para manter estatísticas
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao buscar clientes');
     }
@@ -185,7 +198,6 @@ export const useSupabaseClientes = () => {
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
       })) || []);
-      // NÃO atualiza todosClientes aqui para manter estatísticas
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao filtrar clientes');
     } finally {
@@ -195,14 +207,14 @@ export const useSupabaseClientes = () => {
 
   const addCliente = async (cliente: ClienteFormData) => {
     try {
-      const { data, error: insertError } = await supabase
-        .from('clientes')
-        .insert({
+      const adminUserId = getAdminUserId();
+      const { data, error: insertError } = await supabase.rpc('admin_add_cliente', {
+        p_admin_user_id: adminUserId,
+        p_cliente: {
           ...cliente,
           origem: 'manual',
-        })
-        .select()
-        .single();
+        }
+      });
 
       if (insertError) throw insertError;
 
@@ -215,13 +227,12 @@ export const useSupabaseClientes = () => {
 
   const updateCliente = async (id: string, cliente: Partial<ClienteFormData>) => {
     try {
-      const { error: updateError } = await supabase
-        .from('clientes')
-        .update({
-          ...cliente,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
+      const adminUserId = getAdminUserId();
+      const { error: updateError } = await supabase.rpc('admin_update_cliente', {
+        p_admin_user_id: adminUserId,
+        p_cliente_id: id,
+        p_updates: cliente
+      });
 
       if (updateError) throw updateError;
 
@@ -233,21 +244,21 @@ export const useSupabaseClientes = () => {
 
   const deleteCliente = async (id: string) => {
     try {
-      const { error: deleteError } = await supabase
-        .from('clientes')
-        .delete()
-        .eq('id', id);
+      const adminUserId = getAdminUserId();
+      const { error: deleteError } = await supabase.rpc('admin_delete_cliente', {
+        p_admin_user_id: adminUserId,
+        p_cliente_id: id
+      });
 
       if (deleteError) throw deleteError;
 
       setClientes((prev) => prev.filter((c) => c.id !== id));
-      setTodosClientes((prev) => prev.filter((c) => c.id !== id)); // Atualiza lista completa também
+      setTodosClientes((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao excluir cliente');
     }
   };
 
-  // Usa todosClientes para estatísticas (números fixos)
   const getEstatisticas = () => {
     const total = todosClientes.length;
     const vip = todosClientes.filter(c => c.segmento === 'vip').length;

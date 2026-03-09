@@ -17,6 +17,15 @@ const getUsuarioAtual = () => {
   return null;
 };
 
+// Helper para obter ID do admin logado (throws se não logado)
+const getAdminUserId = (): string => {
+  const usuario = getUsuarioAtual();
+  if (!usuario?.id) {
+    throw new Error('Usuário não autenticado. Faça login novamente.');
+  }
+  return usuario.id;
+};
+
 export const useSupabasePedidos = () => {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,36 +103,17 @@ export const useSupabasePedidos = () => {
 
   const atualizarStatusPedido = async (pedidoId: string, newStatus: Pedido['status']) => {
     try {
+      const adminUserId = getAdminUserId();
       const usuario = getUsuarioAtual();
-      const pedidoAtual = pedidos.find(p => p.id === pedidoId);
-      const statusAnterior = pedidoAtual?.status;
-      
-      // Atualizar pedido com info do operador
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ 
-          status: newStatus, 
-          updated_at: new Date().toISOString(),
-          updated_by_user_id: usuario?.id,
-          updated_by_user_name: usuario?.nome
-        })
-        .eq('id', pedidoId);
+
+      // Atualizar via RPC (inclui histórico automaticamente)
+      const { error } = await supabase.rpc('admin_update_status_pedido', {
+        p_admin_user_id: adminUserId,
+        p_pedido_id: pedidoId,
+        p_new_status: newStatus
+      });
 
       if (error) throw error;
-
-      // Registrar no histórico
-      if (usuario) {
-        await supabase
-          .from('historico_pedidos')
-          .insert({
-            pedido_id: pedidoId,
-            acao: `Status alterado para ${newStatus}`,
-            status_anterior: statusAnterior,
-            status_novo: newStatus,
-            operador_id: usuario.id,
-            operador_nome: usuario.nome
-          });
-      }
 
       // Atualização local imediata (otimista)
       setPedidos((prev) =>
@@ -148,11 +138,13 @@ export const useSupabasePedidos = () => {
 
   const atualizarPedido = async (pedidoAtualizado: Pedido) => {
     try {
-      const usuario = getUsuarioAtual();
-      
-      const { error: pedidoError } = await supabase
-        .from('pedidos')
-        .update({
+      const adminUserId = getAdminUserId();
+
+      // Atualizar via RPC (inclui substituição de itens e histórico)
+      const { error } = await supabase.rpc('admin_update_pedido_completo', {
+        p_admin_user_id: adminUserId,
+        p_pedido_id: pedidoAtualizado.id,
+        p_pedido_data: {
           cliente: pedidoAtualizado.cliente,
           telefone: pedidoAtualizado.telefone,
           email: pedidoAtualizado.email,
@@ -160,42 +152,18 @@ export const useSupabasePedidos = () => {
           valor_total: pedidoAtualizado.valor_total,
           status: pedidoAtualizado.status,
           observacoes: pedidoAtualizado.observacoes,
-          updated_at: new Date().toISOString(),
-          updated_by_user_id: usuario?.id,
-          updated_by_user_name: usuario?.nome
-        })
-        .eq('id', pedidoAtualizado.id);
-
-      if (pedidoError) throw pedidoError;
-
-      // Registrar no histórico
-      if (usuario) {
-        await supabase
-          .from('historico_pedidos')
-          .insert({
-            pedido_id: pedidoAtualizado.id,
-            acao: 'Pedido editado',
-            operador_id: usuario.id,
-            operador_nome: usuario.nome
-          });
-      }
-
-      await supabase.from('itens_pedido').delete().eq('pedido_id', pedidoAtualizado.id);
-
-      for (const item of pedidoAtualizado.itens) {
-        const { error: itemError } = await supabase.from('itens_pedido').insert({
-          pedido_id: pedidoAtualizado.id,
+        },
+        p_itens: pedidoAtualizado.itens.map(item => ({
           produto_id: item.produto_id,
           produto_nome: item.produto_nome,
           quantidade: item.quantidade,
           preco_unitario: item.preco_unitario,
           desconto_percentual: item.desconto_percentual || 0,
           preco_original: item.preco_original || item.preco_unitario,
-        });
+        }))
+      });
 
-        if (itemError) throw itemError;
-      }
-
+      if (error) throw error;
       await fetchPedidos();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar pedido');
@@ -217,7 +185,6 @@ export const useSupabasePedidos = () => {
           table: 'pedidos',
         },
         () => {
-          // Novo pedido inserido - recarrega todos e toca som
           console.log('🔔 Novo pedido recebido via Realtime');
           playNotificationSound('new_order');
           fetchPedidos();
@@ -231,7 +198,6 @@ export const useSupabasePedidos = () => {
           table: 'pedidos',
         },
         () => {
-          // Pedido atualizado - recarrega todos
           console.log('🔄 Pedido atualizado via Realtime');
           fetchPedidos();
         }
@@ -244,7 +210,6 @@ export const useSupabasePedidos = () => {
           table: 'pedidos',
         },
         () => {
-          // Pedido deletado - recarrega todos
           console.log('🗑️ Pedido removido via Realtime');
           fetchPedidos();
         }
