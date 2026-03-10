@@ -136,7 +136,7 @@ export type Periodo = 'hoje' | 'ontem' | '7dias' | 'semana' | 'mes' | 'personali
 
 export type ViewMode = 'table' | 'kanban';
 
-export type TabType = 'atendimentos' | 'dashboard' | 'produtos' | 'clientes';
+export type TabType = 'atendimentos' | 'dashboard' | 'produtos' | 'clientes' | 'notas';
 
 // ============================================
 // CRM - TIPOS DE CLIENTE

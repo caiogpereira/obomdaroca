@@ -6,6 +6,7 @@ import { Atendimentos } from './Atendimentos';
 import { Dashboard } from './Dashboard';
 import { Produtos } from './Produtos';
 import { Clientes } from './Clientes';
+import { NotasDoDia } from './NotasDoDia';
 import { useSupabasePedidos } from '../hooks/useSupabasePedidos';
 import { useSupabaseProdutos } from '../hooks/useSupabaseProdutos';
 import { useSupabaseAtendimentos } from '../hooks/useSupabaseAtendimentos';
@@ -19,7 +20,8 @@ export const AdminLayout = () => {
   const [activeTab, setActiveTab] = useState<TabType>('atendimentos');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { showNotification } = useNotifications();
-// Define o título da página
+
+  // Define o título da página
   useEffect(() => {
     document.title = 'Dashboard - O Bom da Roça';
   }, []);
@@ -233,7 +235,7 @@ export const AdminLayout = () => {
     }
   };
 
-const handleAddCliente = async (cliente: any) => {
+  const handleAddCliente = async (cliente: any) => {
     try {
       await addCliente(cliente);
       setToast({ message: 'Cliente adicionado com sucesso!', type: 'success' });
@@ -311,12 +313,16 @@ const handleAddCliente = async (cliente: any) => {
           />
         )}
 
-       {activeTab === 'clientes' && (
+        {activeTab === 'clientes' && (
           <Clientes
             onAddCliente={handleAddCliente}
             onUpdateCliente={handleUpdateCliente}
             onDeleteCliente={handleDeleteCliente}
           />
+        )}
+
+        {activeTab === 'notas' && (
+          <NotasDoDia />
         )}
       </main>
 
