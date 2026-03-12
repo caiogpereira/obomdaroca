@@ -22,7 +22,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     categoria: produto?.categoria || '',
     subcategoria_id: produto?.subcategoria_id || '',
     marca: produto?.marca || '',
-    imagem_url: produto?.imagem_url || '',
+    image_url: produto?.image_url || '',
     image_storage_path: produto?.image_storage_path || '',
   });
 
@@ -35,7 +35,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const [precoDinheiroDisplay, setPrecoDinheiroDisplay] = useState(produto?.preco_dinheiro ? produto.preco_dinheiro.toFixed(2) : '');
   
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(produto?.imagem_url || '');
+  const [imagePreview, setImagePreview] = useState<string>(produto?.image_url || '');
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [inputMode, setInputMode] = useState<'select' | 'manual'>(
@@ -74,7 +74,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
         if (imageFile && produto?.id) {
           const { url, path } = await uploadProductImage(imageFile, produto.id);
-          finalFormData.imagem_url = url;
+          finalFormData.image_url = url;
           finalFormData.image_storage_path = path;
 
           if (produto.image_storage_path) {
@@ -116,7 +116,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview('');
-    setFormData({ ...formData, imagem_url: '', image_storage_path: '' });
+    setFormData({ ...formData, image_url: '', image_storage_path: '' });
   };
 
   const filteredCategories = categorias.filter((cat) =>
