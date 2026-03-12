@@ -1,9 +1,16 @@
 import { supabase } from '../lib/supabase';
 
-const MAX_FILE_SIZE = 500 * 1024;
+const MAX_UPLOAD_SIZE = 50 * 1024; // 50kb no Storage
 const BUCKET_NAME = 'produtos-imagens';
 
-export const compressImage = async (file: File, maxSizeKB: number = 500): Promise<File> => {
+/**
+ * Comprime uma imagem progressivamente até atingir o tamanho alvo.
+ * Reduz dimensões e qualidade iterativamente.
+ */
+export const compressImage = async (
+  file: File,
+  maxSizeKB: number = 50
+): Promise<File> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -11,53 +18,75 @@ export const compressImage = async (file: File, maxSizeKB: number = 500): Promis
       const img = new Image();
 
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        const targetBytes = maxSizeKB * 1024;
 
-        const maxDimension = 1200;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = (height / width) * maxDimension;
-            width = maxDimension;
-          } else {
-            width = (width / height) * maxDimension;
-            height = maxDimension;
-          }
-        }
+        // Começa com dimensão máxima de 800px
+        let maxDimension = 800;
+        let quality = 0.85;
 
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        let quality = 0.9;
         const tryCompress = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+
+          // Reduz dimensões proporcionalmente
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height / width) * maxDimension);
+              width = maxDimension;
+            } else {
+              width = Math.round((width / height) * maxDimension);
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Falha ao processar imagem'));
+            return;
+          }
+
+          // Fundo branco (evita transparência que aumenta tamanho)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
           canvas.toBlob(
             (blob) => {
               if (!blob) {
-                reject(new Error('Failed to compress image'));
+                reject(new Error('Falha ao comprimir imagem'));
                 return;
               }
 
-              const targetSize = maxSizeKB * 1024;
-
-              if (blob.size <= targetSize || quality <= 0.1) {
-                const compressedFile = new File([blob], file.name, {
+              if (blob.size <= targetBytes) {
+                // Tamanho OK — retorna
+                const compressed = new File([blob], file.name, {
                   type: 'image/jpeg',
                   lastModified: Date.now(),
                 });
-                resolve(compressedFile);
-              } else {
-                quality -= 0.1;
-                tryCompress();
+                resolve(compressed);
+                return;
               }
+
+              // Ainda grande — reduz qualidade ou dimensão
+              if (quality > 0.2) {
+                quality -= 0.1;
+              } else if (maxDimension > 200) {
+                maxDimension = Math.round(maxDimension * 0.75);
+                quality = 0.7;
+              } else {
+                // Limite atingido — aceita o menor possível
+                const compressed = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressed);
+                return;
+              }
+
+              tryCompress();
             },
             'image/jpeg',
             quality
@@ -67,36 +96,33 @@ export const compressImage = async (file: File, maxSizeKB: number = 500): Promis
         tryCompress();
       };
 
-      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onerror = () => reject(new Error('Falha ao carregar imagem'));
       img.src = e.target?.result as string;
     };
 
-    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
     reader.readAsDataURL(file);
   });
 };
 
-export const uploadProductImage = async (file: File, productId: string): Promise<{ url: string; path: string }> => {
+export const uploadProductImage = async (
+  file: File,
+  productId: string
+): Promise<{ url: string; path: string }> => {
   try {
-    let fileToUpload = file;
+    // Sempre comprime para máximo 50kb
+    const compressed = await compressImage(file, 50);
 
-    if (file.size > MAX_FILE_SIZE) {
-      fileToUpload = await compressImage(file);
-    }
-
-    if (fileToUpload.size > MAX_FILE_SIZE) {
-      throw new Error(`Imagem muito grande. Tamanho máximo: 500KB. Tamanho atual: ${Math.round(fileToUpload.size / 1024)}KB`);
-    }
-
-    const fileExt = file.name.split('.').pop();
+    const fileExt = 'jpg'; // sempre salva como jpg após compressão
     const fileName = `${productId}.${fileExt}`;
-    const filePath = fileName;
+    const filePath = fileName; // raiz do bucket, sem subpasta
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(filePath, fileToUpload, {
+      .upload(filePath, compressed, {
         cacheControl: '3600',
         upsert: true,
+        contentType: 'image/jpeg',
       });
 
     if (uploadError) throw uploadError;
@@ -110,33 +136,31 @@ export const uploadProductImage = async (file: File, productId: string): Promise
       path: filePath,
     };
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Erro no upload de imagem:', error);
     throw error;
   }
 };
 
 export const deleteProductImage = async (path: string): Promise<void> => {
   try {
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .remove([path]);
-
+    const { error } = await supabase.storage.from(BUCKET_NAME).remove([path]);
     if (error) throw error;
   } catch (error) {
-    console.error('Error deleting image:', error);
+    console.error('Erro ao deletar imagem:', error);
     throw error;
   }
 };
 
 export const validateImageFile = (file: File): string | null => {
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
   if (!validTypes.includes(file.type)) {
-    return 'Formato de arquivo inválido. Use JPG, PNG ou WEBP.';
+    return 'Formato inválido. Use JPG, PNG, WEBP ou GIF.';
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    return 'Arquivo muito grande. Tamanho máximo: 5MB.';
+  // Aceita até 20MB para upload — comprime para 50kb automaticamente
+  if (file.size > 20 * 1024 * 1024) {
+    return 'Arquivo muito grande. Tamanho máximo: 20MB.';
   }
 
   return null;

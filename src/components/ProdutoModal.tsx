@@ -22,20 +22,26 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     categoria: produto?.categoria || '',
     subcategoria_id: produto?.subcategoria_id || '',
     marca: produto?.marca || '',
-    image_url: produto?.image_url || '',
+    image_url: produto?.image_url || '',           // ← CORRETO
     image_storage_path: produto?.image_storage_path || '',
   });
 
   const [precoVarejoDisplay, setPrecoVarejoDisplay] = useState(
-    produto?.preco_varejo ? produto.preco_varejo.toFixed(2) : 
+    produto?.preco_varejo ? produto.preco_varejo.toFixed(2) :
     produto?.preco ? produto.preco.toFixed(2) : ''
   );
-  const [precoCartaoDisplay, setPrecoCartaoDisplay] = useState(produto?.preco_cartao ? produto.preco_cartao.toFixed(2) : '');
-  const [precoPixDisplay, setPrecoPixDisplay] = useState(produto?.preco_pix ? produto.preco_pix.toFixed(2) : '');
-  const [precoDinheiroDisplay, setPrecoDinheiroDisplay] = useState(produto?.preco_dinheiro ? produto.preco_dinheiro.toFixed(2) : '');
-  
+  const [precoCartaoDisplay, setPrecoCartaoDisplay] = useState(
+    produto?.preco_cartao ? produto.preco_cartao.toFixed(2) : ''
+  );
+  const [precoPixDisplay, setPrecoPixDisplay] = useState(
+    produto?.preco_pix ? produto.preco_pix.toFixed(2) : ''
+  );
+  const [precoDinheiroDisplay, setPrecoDinheiroDisplay] = useState(
+    produto?.preco_dinheiro ? produto.preco_dinheiro.toFixed(2) : ''
+  );
+
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(produto?.image_url || '');
+  const [imagePreview, setImagePreview] = useState<string>(produto?.image_url || ''); // ← CORRETO
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [inputMode, setInputMode] = useState<'select' | 'manual'>(
@@ -47,50 +53,42 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
-    if (!formData.codigo.trim()) {
-      newErrors.codigo = 'Código é obrigatório';
-    }
-    if (!formData.nome.trim()) {
-      newErrors.nome = 'Nome é obrigatório';
-    }
-    if (formData.preco_varejo <= 0) {
-      newErrors.preco_varejo = 'Preço Varejo deve ser maior que zero';
-    }
-
+    if (!formData.codigo.trim()) newErrors.codigo = 'Código é obrigatório';
+    if (!formData.nome.trim()) newErrors.nome = 'Nome é obrigatório';
+    if (formData.preco_varejo <= 0) newErrors.preco_varejo = 'Preço Varejo deve ser maior que zero';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      try {
-        setUploadingImage(true);
-        let finalFormData = { 
-          ...formData,
-          preco: formData.preco_varejo // Mantém compatibilidade com campo antigo
-        };
+    if (!validate()) return;
 
-        if (imageFile && produto?.id) {
-          const { url, path } = await uploadProductImage(imageFile, produto.id);
-          finalFormData.image_url = url;
-          finalFormData.image_storage_path = path;
+    try {
+      setUploadingImage(true);
+      let finalFormData = {
+        ...formData,
+        preco: formData.preco_varejo,
+      };
 
-          if (produto.image_storage_path) {
-            await deleteProductImage(produto.image_storage_path);
-          }
+      if (imageFile && produto?.id) {
+        const { url, path } = await uploadProductImage(imageFile, produto.id);
+        finalFormData.image_url = url;           // ← CORRETO
+        finalFormData.image_storage_path = path;
+
+        if (produto.image_storage_path && produto.image_storage_path !== path) {
+          await deleteProductImage(produto.image_storage_path);
         }
-
-        if (inputMode === 'manual' && manualCategory.trim()) {
-          onSave({ ...finalFormData, subcategoria_id: manualCategory.trim() });
-        } else {
-          onSave(finalFormData);
-        }
-      } catch (err) {
-        setErrors({ ...errors, image: err instanceof Error ? err.message : 'Erro ao fazer upload da imagem' });
-        setUploadingImage(false);
       }
+
+      if (inputMode === 'manual' && manualCategory.trim()) {
+        onSave({ ...finalFormData, subcategoria_id: manualCategory.trim() });
+      } else {
+        onSave(finalFormData);
+      }
+    } catch (err) {
+      setErrors({ ...errors, image: err instanceof Error ? err.message : 'Erro ao fazer upload da imagem' });
+      setUploadingImage(false);
     }
   };
 
@@ -102,7 +100,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
         setErrors({ ...errors, image: validationError });
         return;
       }
-
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -116,7 +113,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview('');
-    setFormData({ ...formData, image_url: '', image_storage_path: '' });
+    setFormData({ ...formData, image_url: '', image_storage_path: '' }); // ← CORRETO
   };
 
   const filteredCategories = categorias.filter((cat) =>
@@ -140,16 +137,14 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
           <h2 className="text-xl font-bold text-gray-900">
             {produto ? 'Editar Produto' : 'Novo Produto'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
+
             {/* Código */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -164,9 +159,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                 }`}
                 placeholder="Ex: PROD001"
               />
-              {errors.codigo && (
-                <p className="mt-1 text-sm text-red-600">{errors.codigo}</p>
-              )}
+              {errors.codigo && <p className="mt-1 text-sm text-red-600">{errors.codigo}</p>}
             </div>
 
             {/* Nome */}
@@ -183,16 +176,12 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                 }`}
                 placeholder="Ex: Cachaça Artesanal 500ml"
               />
-              {errors.nome && (
-                <p className="mt-1 text-sm text-red-600">{errors.nome}</p>
-              )}
+              {errors.nome && <p className="mt-1 text-sm text-red-600">{errors.nome}</p>}
             </div>
 
             {/* Marca */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Marca
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
               <input
                 type="text"
                 value={formData.marca}
@@ -205,7 +194,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               </p>
             </div>
 
-            {/* Preço Varejo */}
+            {/* Preços */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Preço Varejo (R$) *
@@ -221,11 +210,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                     const numValue = parseFloat(value) || 0;
                     setFormData({ ...formData, preco_varejo: numValue, preco: numValue });
                   }}
-                  onFocus={() => {
-                    if (precoVarejoDisplay === '' || parseFloat(precoVarejoDisplay) === 0) {
-                      setPrecoVarejoDisplay('');
-                    }
-                  }}
                   onBlur={() => {
                     const numValue = parseFloat(precoVarejoDisplay) || 0;
                     setPrecoVarejoDisplay(numValue > 0 ? numValue.toFixed(2) : '');
@@ -236,86 +220,79 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                   placeholder="0.00"
                 />
               </div>
+              {errors.preco_varejo && <p className="mt-1 text-sm text-red-600">{errors.preco_varejo}</p>}
               <p className="mt-1 text-xs text-gray-500">Preço padrão, sem quantidade mínima</p>
-              {errors.preco_varejo && (
-                <p className="mt-1 text-sm text-red-600">{errors.preco_varejo}</p>
-              )}
             </div>
 
-            {/* Preços Atacado */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Preço Cartão */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço Cartão (R$)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preço Cartão (R$)</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
                   <input
                     type="text"
                     value={precoCartaoDisplay}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
                       setPrecoCartaoDisplay(value);
-                      const numValue = parseFloat(value) || undefined;
-                      setFormData({ ...formData, preco_cartao: numValue });
+                      const numValue = parseFloat(value) || 0;
+                      setFormData({ ...formData, preco_cartao: numValue || undefined });
                     }}
                     onBlur={() => {
                       const numValue = parseFloat(precoCartaoDisplay) || 0;
                       setPrecoCartaoDisplay(numValue > 0 ? numValue.toFixed(2) : '');
                     }}
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="0.00"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 10un</p>
               </div>
 
+              {/* Preço PIX */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço PIX (R$)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preço PIX (R$)</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
                   <input
                     type="text"
                     value={precoPixDisplay}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
                       setPrecoPixDisplay(value);
-                      const numValue = parseFloat(value) || undefined;
-                      setFormData({ ...formData, preco_pix: numValue });
+                      const numValue = parseFloat(value) || 0;
+                      setFormData({ ...formData, preco_pix: numValue || undefined });
                     }}
                     onBlur={() => {
                       const numValue = parseFloat(precoPixDisplay) || 0;
                       setPrecoPixDisplay(numValue > 0 ? numValue.toFixed(2) : '');
                     }}
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="0.00"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 15un</p>
+                <p className="mt-1 text-xs text-gray-500">Min. R$300 ou 10un</p>
               </div>
 
+              {/* Preço TED/Dinheiro */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço TED/Dinheiro (R$)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preço TED/Dinheiro (R$)</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">R$</span>
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
                   <input
                     type="text"
                     value={precoDinheiroDisplay}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
                       setPrecoDinheiroDisplay(value);
-                      const numValue = parseFloat(value) || undefined;
-                      setFormData({ ...formData, preco_dinheiro: numValue });
+                      const numValue = parseFloat(value) || 0;
+                      setFormData({ ...formData, preco_dinheiro: numValue || undefined });
                     }}
                     onBlur={() => {
                       const numValue = parseFloat(precoDinheiroDisplay) || 0;
                       setPrecoDinheiroDisplay(numValue > 0 ? numValue.toFixed(2) : '');
                     }}
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="0.00"
                   />
                 </div>
@@ -325,9 +302,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
             {/* Categoria */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categoria
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
               <input
                 type="text"
                 value={formData.categoria}
@@ -339,18 +314,13 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
             {/* Subcategoria */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Subcategoria
-              </label>
-
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subcategoria</label>
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
                   onClick={() => setInputMode('select')}
                   className={`px-3 py-1 text-xs rounded ${
-                    inputMode === 'select'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    inputMode === 'select' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
                   Selecionar
@@ -359,9 +329,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                   type="button"
                   onClick={() => setInputMode('manual')}
                   className={`px-3 py-1 text-xs rounded ${
-                    inputMode === 'manual'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    inputMode === 'manual' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
                   Criar Subcategoria
@@ -376,9 +344,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                 >
                   <option value="">Selecione uma subcategoria</option>
                   {categorias.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome}
-                    </option>
+                    <option key={cat.id} value={cat.id}>{cat.nome}</option>
                   ))}
                 </select>
               ) : (
@@ -405,9 +371,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                       ))}
                     </div>
                   )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Se não existir, será criada automaticamente
-                  </p>
+                  <p className="mt-1 text-xs text-gray-500">Se não existir, será criada automaticamente</p>
                 </div>
               )}
             </div>
@@ -417,6 +381,9 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Imagem do Produto
               </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Aceita JPG, PNG, WEBP até 20MB — comprimida automaticamente para ~50kb
+              </p>
               {imagePreview ? (
                 <div className="relative">
                   <img
@@ -437,7 +404,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-10 h-10 text-gray-400 mb-3" />
                     <p className="text-sm text-gray-600 font-medium mb-1">Clique para adicionar imagem</p>
-                    <p className="text-xs text-gray-500">JPG, PNG ou WEBP (máx. 5MB)</p>
+                    <p className="text-xs text-gray-500">JPG, PNG ou WEBP (máx. 20MB — comprime automático)</p>
                   </div>
                   <input
                     type="file"
@@ -447,10 +414,9 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
                   />
                 </label>
               )}
-              {errors.image && (
-                <p className="mt-1 text-sm text-red-600">{errors.image}</p>
-              )}
+              {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
             </div>
+
           </div>
 
           <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
@@ -460,7 +426,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
               className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-5 h-5" />
-              {uploadingImage ? 'Salvando...' : produto ? 'Salvar Alterações' : 'Adicionar Produto'}
+              {uploadingImage ? 'Comprimindo e salvando...' : produto ? 'Salvar Alterações' : 'Adicionar Produto'}
             </button>
             <button
               type="button"
