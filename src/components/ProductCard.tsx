@@ -67,9 +67,9 @@ export const ProductCard = ({ produto, onAddToCart }: ProductCardProps) => {
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col">
       {/* Imagem */}
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
-        {produto.imagem_url && !imageError ? (
+        {produto.image_url && !imageError ? (
           <img
-            src={produto.imagem_url}
+            src={produto.image_url}
             alt={produto.nome}
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
