@@ -107,7 +107,7 @@ export const Catalogo = () => {
         preco_dinheiro: p.preco_dinheiro ? parseFloat(p.preco_dinheiro) : undefined,
         categoria: p.categoria || undefined,
         marca: p.marca || undefined,
-        imagem_url: p.imagem_url || p.image_url || undefined,
+        image_url: p.image_url || undefined,
         image_storage_path: p.image_storage_path || undefined,
         subcategoria_id: p.subcategoria_id,
         subcategoria: p.subcategoria?.nome || p.subcategoria,

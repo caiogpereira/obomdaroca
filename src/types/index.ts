@@ -63,7 +63,8 @@ export interface Produto {
   subcategoria_id?: string;
   subcategoria?: string;
   marca?: string;
-  imagem_url?: string;
+  image_url?: string;
+  image_storage_path?: string;
   ativo?: boolean;
   created_at?: string;
   updated_at?: string;
