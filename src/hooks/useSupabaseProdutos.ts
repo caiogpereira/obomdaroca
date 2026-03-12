@@ -156,61 +156,55 @@ export const useSupabaseProdutos = () => {
   };
 
   const updateProduto = async (
-    id: string,
-    produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
-      const adminUserId = getAdminUserId();
-      let subcategoria_id = produto.subcategoria_id || null;
+  id: string,
+  produto: Omit<Produto, 'id' | 'created_at' | 'updated_at'>
+) => {
+  try {
+    let subcategoria_id = produto.subcategoria_id || null;
 
-      if (subcategoria_id) {
-        const existingCategory = categorias.find(
-          (cat) => cat.id === subcategoria_id || cat.nome.toLowerCase() === (subcategoria_id || '').toLowerCase()
-        );
-
-        if (existingCategory) {
-          subcategoria_id = existingCategory.id;
-        } else {
-          // Criar categoria via RPC
-          const { data: newCat, error: catError } = await supabase.rpc('admin_create_categoria', {
-            p_admin_user_id: adminUserId,
-            p_nome: subcategoria_id
-          });
-
-          if (catError) throw catError;
-          if (newCat) {
-            subcategoria_id = newCat.id;
-            await fetchCategorias();
-          }
+    if (subcategoria_id) {
+      const existingCategory = categorias.find(
+        (cat) => cat.id === subcategoria_id || cat.nome.toLowerCase() === (subcategoria_id || '').toLowerCase()
+      );
+      if (existingCategory) {
+        subcategoria_id = existingCategory.id;
+      } else {
+        const { data: newCat, error: catError } = await supabase
+          .from('categorias')
+          .insert({ nome: subcategoria_id })
+          .select()
+          .maybeSingle();
+        if (catError) throw catError;
+        if (newCat) {
+          subcategoria_id = newCat.id;
+          await fetchCategorias();
         }
       }
-
-      // Atualizar produto via RPC
-      // preco e preco_varejo devem ser sincronizados (preco_varejo é o exibido no catálogo)
-      const { error } = await supabase.rpc('admin_update_produto', {
-        p_admin_user_id: adminUserId,
-        p_produto_id: id,
-        p_updates: {
-          codigo: produto.codigo,
-          nome: produto.nome,
-          preco: produto.preco,
-          preco_varejo: produto.preco_varejo || produto.preco,
-          preco_cartao: produto.preco_cartao || null,
-          preco_pix: produto.preco_pix || null,
-          preco_dinheiro: produto.preco_dinheiro || null,
-          preco_oferta: produto.preco_oferta || null,
-          image_url: produto.image_url || null,
-          image_storage_path: produto.image_storage_path || null,
-          subcategoria_id,
-        }
-      });
-
-      if (error) throw error;
-      await fetchProdutos();
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar produto');
     }
-  };
+
+    const { error } = await supabase.rpc('update_produto_completo', {
+      p_id: id,
+      p_codigo: produto.codigo,
+      p_nome: produto.nome,
+      p_preco: produto.preco || produto.preco_varejo || 0,
+      p_preco_varejo: produto.preco_varejo || null,
+      p_preco_cartao: produto.preco_cartao || null,
+      p_preco_pix: produto.preco_pix || null,
+      p_preco_dinheiro: produto.preco_dinheiro || null,
+      p_preco_oferta: produto.preco_oferta || null,
+      p_image_url: produto.image_url || null,
+      p_image_storage_path: produto.image_storage_path || null,
+      p_subcategoria_id: subcategoria_id || null,
+      p_marca: produto.marca || null,
+      p_categoria: produto.categoria || null,
+    });
+
+    if (error) throw error;
+    await fetchProdutos();
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar produto');
+  }
+};
 
   const deleteProduto = async (id: string) => {
     try {
