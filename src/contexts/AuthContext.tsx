@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from '../hooks/useLogsAtendimento';
 
 interface UserProfile {
   id: string;
@@ -21,7 +22,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Chave para armazenar sessão no localStorage
 const SESSION_KEY = 'obdr_user_session';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -35,7 +35,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const savedSession = localStorage.getItem(SESSION_KEY);
         if (savedSession) {
           const userData = JSON.parse(savedSession) as UserProfile;
-          // Verificar se o usuário ainda está ativo no banco
           verifyUser(userData.id).then((isValid) => {
             if (isValid) {
               setUser(userData);
@@ -57,7 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loadSession();
   }, []);
 
-  // Verificar se usuário ainda está ativo
   const verifyUser = async (userId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase
@@ -74,7 +72,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    // Chamar função do banco para verificar senha
     const { data, error } = await supabase.rpc('verify_user_password', {
       p_email: email.toLowerCase().trim(),
       p_password: password,
@@ -98,9 +95,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Salvar sessão
     setUser(userData);
     localStorage.setItem(SESSION_KEY, JSON.stringify(userData));
+
+    // Registrar log de login
+    registrarLog({
+      tipo: 'sistema',
+      acao: 'login',
+      descricao: `Login realizado por ${userData.full_name} (${userData.email})`,
+      usuario_id: userData.id,
+      usuario_nome: userData.full_name,
+      detalhes: { email: userData.email, role: userData.role },
+    });
   };
 
   const signOut = async () => {
+    const currentUser = user;
+    
+    // Registrar log de logout ANTES de limpar
+    if (currentUser) {
+      registrarLog({
+        tipo: 'sistema',
+        acao: 'logout',
+        descricao: `Logout realizado por ${currentUser.full_name}`,
+        usuario_id: currentUser.id,
+        usuario_nome: currentUser.full_name,
+        detalhes: { email: currentUser.email },
+      });
+    }
+
     setUser(null);
     localStorage.removeItem(SESSION_KEY);
   };
@@ -111,7 +132,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider 
       value={{ 
         user, 
-        profile: user, // Manter compatibilidade com código existente
+        profile: user,
         loading, 
         signIn, 
         signOut, 

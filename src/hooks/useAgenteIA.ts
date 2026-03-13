@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from './useLogsAtendimento';
 
 interface StatusAgente {
   bloqueado: boolean;
@@ -21,11 +22,7 @@ interface BloqueioAgente {
   ativo: boolean;
 }
 
-// =====================================================
-// FIX: Usar localStorage (auth customizada) ao invés de
-// supabase.auth.getUser() que SEMPRE retorna null neste projeto
-// Alinhado com o padrão usado em useSupabasePedidos.ts
-// =====================================================
+// Auth customizada via localStorage
 const getUsuarioAtual = () => {
   try {
     const session = localStorage.getItem('obdr_user_session');
@@ -42,7 +39,6 @@ const getUsuarioAtual = () => {
 export const useAgenteIA = () => {
   const [loading, setLoading] = useState(false);
 
-  // Verificar se o agente está bloqueado para um telefone
   const verificarBloqueio = useCallback(async (telefone: string): Promise<StatusAgente> => {
     try {
       const telefoneNormalizado = telefone.replace(/\D/g, '');
@@ -77,7 +73,6 @@ export const useAgenteIA = () => {
     }
   }, []);
 
-  // Ativar atendimento humano (desativar agente IA)
   const ativarAtendimentoHumano = useCallback(async (
     telefone: string,
     clienteNome: string,
@@ -86,7 +81,6 @@ export const useAgenteIA = () => {
   ): Promise<boolean> => {
     setLoading(true);
     try {
-      // FIX: Agora lê do localStorage corretamente
       const usuario = getUsuarioAtual();
 
       if (!usuario) {
@@ -96,13 +90,11 @@ export const useAgenteIA = () => {
 
       const telefoneNormalizado = telefone.replace(/\D/g, '');
 
-      // DELETA registros anteriores deste telefone (limpa a tabela)
       await supabase
         .from('agente_ia_bloqueio')
         .delete()
         .eq('telefone', telefoneNormalizado);
 
-      // Criar novo bloqueio
       const expiraEm = new Date();
       expiraEm.setHours(expiraEm.getHours() + duracaoHoras);
 
@@ -124,6 +116,17 @@ export const useAgenteIA = () => {
         return false;
       }
 
+      // Log
+      registrarLog({
+        tipo: 'agente_ia',
+        acao: 'ativar_atendimento_humano',
+        descricao: `Agente IA desativado para ${clienteNome} (${telefoneNormalizado}) por ${usuario.nome}`,
+        entidade_tipo: 'agente_ia_bloqueio',
+        usuario_id: usuario.id,
+        usuario_nome: usuario.nome,
+        detalhes: { telefone: telefoneNormalizado, cliente: clienteNome, duracao_horas: duracaoHoras },
+      });
+
       return true;
     } catch (err) {
       console.error('Erro ao ativar atendimento humano:', err);
@@ -133,14 +136,12 @@ export const useAgenteIA = () => {
     }
   }, []);
 
-  // Desativar atendimento humano (reativar agente IA)
-  // DELETA o registro ao invés de marcar ativo=false
   const desativarAtendimentoHumano = useCallback(async (telefone: string): Promise<boolean> => {
     setLoading(true);
     try {
+      const usuario = getUsuarioAtual();
       const telefoneNormalizado = telefone.replace(/\D/g, '');
 
-      // DELETA o registro ao invés de apenas marcar como inativo
       const { error } = await supabase
         .from('agente_ia_bloqueio')
         .delete()
@@ -152,6 +153,17 @@ export const useAgenteIA = () => {
         return false;
       }
 
+      // Log
+      registrarLog({
+        tipo: 'agente_ia',
+        acao: 'desativar_atendimento_humano',
+        descricao: `Agente IA reativado para telefone ${telefoneNormalizado} por ${usuario?.nome || 'Sistema'}`,
+        entidade_tipo: 'agente_ia_bloqueio',
+        usuario_id: usuario?.id,
+        usuario_nome: usuario?.nome,
+        detalhes: { telefone: telefoneNormalizado },
+      });
+
       return true;
     } catch (err) {
       console.error('Erro ao desativar atendimento humano:', err);
@@ -161,7 +173,6 @@ export const useAgenteIA = () => {
     }
   }, []);
 
-  // Toggle do atendimento humano
   const toggleAtendimentoHumano = useCallback(async (
     telefone: string,
     clienteNome: string,
@@ -174,7 +185,6 @@ export const useAgenteIA = () => {
     }
   }, [ativarAtendimentoHumano, desativarAtendimentoHumano]);
 
-  // Buscar histórico de bloqueios de um telefone
   const buscarHistorico = useCallback(async (telefone: string): Promise<BloqueioAgente[]> => {
     try {
       const telefoneNormalizado = telefone.replace(/\D/g, '');

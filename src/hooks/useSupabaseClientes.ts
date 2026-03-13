@@ -1,20 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Cliente, ClienteFormData, ProdutoTopCliente, Pedido } from '../types';
-
-// Helper para obter ID do admin logado
-const getAdminUserId = (): string => {
-  try {
-    const session = localStorage.getItem('obdr_user_session');
-    if (session) {
-      const user = JSON.parse(session);
-      return user.id;
-    }
-  } catch (e) {
-    console.error('Erro ao obter usuário:', e);
-  }
-  throw new Error('Usuário não autenticado. Faça login novamente.');
-};
+import { registrarLog } from './useLogsAtendimento';
 
 export const useSupabaseClientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -48,9 +35,9 @@ export const useSupabaseClientes = () => {
     }
   }, []);
 
-  const getClienteComHistorico = async (clienteId: string) => {
+  const getClienteComHistorico = useCallback(async (clienteId: string) => {
     try {
-      const { data: clienteData, error: clienteError } = await supabase
+      const { data: cliente, error: clienteError } = await supabase
         .from('clientes')
         .select('*')
         .eq('id', clienteId)
@@ -58,165 +45,151 @@ export const useSupabaseClientes = () => {
 
       if (clienteError) throw clienteError;
 
-      const { data: pedidosData, error: pedidosError } = await supabase
+      // Buscar pedidos do cliente
+      const { data: pedidosData } = await supabase
         .from('pedidos')
+        .select('*, itens_pedido(*)')
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false });
+
+      // Buscar pedidos arquivados do cliente
+      const { data: arquivadosData } = await supabase
+        .from('pedidos_arquivados')
         .select('*')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false });
 
-      if (pedidosError) throw pedidosError;
-
-      const pedidosComItens = await Promise.all(
-        (pedidosData || []).map(async (pedido) => {
-          const { data: itensData } = await supabase
-            .from('itens_pedido')
-            .select('*')
-            .eq('pedido_id', pedido.id);
-
-          return {
-            id: pedido.id,
-            numero: pedido.numero_pedido,
-            cliente: pedido.cliente,
-            telefone: pedido.telefone,
-            email: pedido.email || '',
-            endereco: pedido.endereco || '',
-            items: (itensData || []).map((item) => ({
-              id: item.id,
-              pedido_id: item.pedido_id,
-              produto_id: item.produto_id,
-              produto_nome: item.produto_nome,
-              quantidade: item.quantidade,
-              preco_unitario: parseFloat(item.preco_unitario),
-            })),
-            total: parseFloat(pedido.valor_total),
-            status: pedido.status,
-            forma_pagamento: pedido.forma_pagamento || '',
-            observacoes: pedido.observacoes || '',
-            created_at: pedido.created_at,
-            updated_at: pedido.updated_at,
-          } as Pedido;
-        })
-      );
-
-      const { data: produtosTopData, error: produtosError } = await supabase
-        .rpc('get_produtos_top_cliente', { p_cliente_id: clienteId, p_limit: 5 });
-
-      if (produtosError) {
-        console.warn('Erro ao buscar produtos top:', produtosError);
+      // Calcular produtos top
+      const produtosCount = new Map<string, { nome: string; quantidade: number; pedidos: number; valor: number }>();
+      
+      for (const pedido of (pedidosData || [])) {
+        for (const item of (pedido.itens_pedido || [])) {
+          const existing = produtosCount.get(item.produto_nome) || { nome: item.produto_nome, quantidade: 0, pedidos: 0, valor: 0 };
+          existing.quantidade += item.quantidade;
+          existing.pedidos += 1;
+          existing.valor += parseFloat(item.preco_unitario) * item.quantidade;
+          produtosCount.set(item.produto_nome, existing);
+        }
       }
 
+      const produtosTop: ProdutoTopCliente[] = Array.from(produtosCount.values())
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, 5)
+        .map(p => ({
+          produto_nome: p.nome,
+          total_quantidade: p.quantidade,
+          total_pedidos: p.pedidos,
+          total_valor: p.valor,
+        }));
+
       return {
-        ...clienteData,
-        total_gasto: parseFloat(clienteData.total_gasto) || 0,
-        ticket_medio: parseFloat(clienteData.ticket_medio) || 0,
-        pedidos: pedidosComItens,
-        produtos_top: (produtosTopData || []).map((p: any) => ({
-          produto_nome: p.produto_nome,
-          total_quantidade: parseInt(p.total_quantidade) || 0,
-          total_pedidos: parseInt(p.total_pedidos) || 0,
-          total_valor: parseFloat(p.total_valor) || 0,
-        })) as ProdutoTopCliente[],
+        ...cliente,
+        total_gasto: parseFloat(cliente.total_gasto) || 0,
+        ticket_medio: parseFloat(cliente.ticket_medio) || 0,
+        pedidos: pedidosData || [],
+        pedidos_arquivados: arquivadosData || [],
+        produtos_top: produtosTop,
       };
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erro ao carregar cliente');
+      console.error('Erro ao buscar cliente com histórico:', err);
+      return null;
     }
-  };
+  }, []);
 
-  const buscarPorTelefone = async (telefone: string) => {
+  const buscarPorTelefone = useCallback(async (telefone: string) => {
     try {
       const telefoneNormalizado = telefone.replace(/\D/g, '');
-      
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('clientes')
         .select('*')
         .eq('telefone', telefoneNormalizado)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
-
-      return data ? {
-        ...data,
-        total_gasto: parseFloat(data.total_gasto) || 0,
-        ticket_medio: parseFloat(data.ticket_medio) || 0,
-      } as Cliente : null;
+      if (error) throw error;
+      return data;
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erro ao buscar cliente');
+      console.error('Erro ao buscar por telefone:', err);
+      return null;
     }
-  };
+  }, []);
 
-  const buscarClientes = async (termo: string) => {
-    try {
-      const termoLimpo = termo.trim();
-      if (!termoLimpo) {
-        await fetchClientes();
-        return;
-      }
-
-      const apenasNumeros = termoLimpo.replace(/\D/g, '');
-      const ehTelefone = apenasNumeros.length >= 8;
-
-      let query = supabase.from('clientes').select('*');
-
-      if (ehTelefone) {
-        query = query.ilike('telefone', `%${apenasNumeros}%`);
-      } else {
-        query = query.or(`nome.ilike.%${termoLimpo}%,nome_empresa.ilike.%${termoLimpo}%,cpf_cnpj.ilike.%${termoLimpo}%`);
-      }
-
-      const { data, error: fetchError } = await query.order('ultima_compra', { ascending: false, nullsFirst: false });
-
-      if (fetchError) throw fetchError;
-
-      setClientes(data?.map(c => ({
-        ...c,
-        total_gasto: parseFloat(c.total_gasto) || 0,
-        ticket_medio: parseFloat(c.ticket_medio) || 0,
-      })) || []);
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erro ao buscar clientes');
-    }
-  };
-
-  const filtrarPorSegmento = async (segmento: string | null) => {
+  const buscarClientes = useCallback(async (termo: string) => {
     try {
       setLoading(true);
-      
-      let query = supabase.from('clientes').select('*');
-      
-      if (segmento) {
-        query = query.eq('segmento', segmento);
-      }
-      
-      const { data, error: fetchError } = await query.order('ultima_compra', { ascending: false, nullsFirst: false });
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .or(`nome.ilike.%${termo}%,telefone.ilike.%${termo}%,cpf_cnpj.ilike.%${termo}%,nome_empresa.ilike.%${termo}%`)
+        .order('ultima_compra', { ascending: false, nullsFirst: false })
+        .limit(50);
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
 
-      setClientes(data?.map(c => ({
+      const clientesFormatados = data?.map(c => ({
         ...c,
         total_gasto: parseFloat(c.total_gasto) || 0,
         ticket_medio: parseFloat(c.ticket_medio) || 0,
-      })) || []);
+      })) || [];
+
+      setClientes(clientesFormatados);
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erro ao filtrar clientes');
+      setError(err instanceof Error ? err.message : 'Erro ao buscar clientes');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const filtrarPorSegmento = useCallback(async (segmento: string) => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('clientes')
+        .select('*')
+        .order('ultima_compra', { ascending: false, nullsFirst: false });
+
+      if (segmento !== 'todos') {
+        query = query.eq('segmento', segmento);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const clientesFormatados = data?.map(c => ({
+        ...c,
+        total_gasto: parseFloat(c.total_gasto) || 0,
+        ticket_medio: parseFloat(c.ticket_medio) || 0,
+      })) || [];
+
+      setClientes(clientesFormatados);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao filtrar clientes');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const addCliente = async (cliente: ClienteFormData) => {
     try {
-      const adminUserId = getAdminUserId();
-      const { data, error: insertError } = await supabase.rpc('admin_add_cliente', {
-        p_admin_user_id: adminUserId,
-        p_cliente: {
+      const { data, error: insertError } = await supabase
+        .from('clientes')
+        .insert({
           ...cliente,
           origem: 'manual',
-        }
-      });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      // Log
+      registrarLog({
+        tipo: 'cliente',
+        acao: 'criar_cliente',
+        descricao: `Cliente "${cliente.nome}" cadastrado`,
+        entidade_tipo: 'cliente',
+        entidade_id: data?.id,
+        detalhes: { nome: cliente.nome, telefone: cliente.telefone },
+      });
 
       await fetchClientes();
       return data;
@@ -227,14 +200,27 @@ export const useSupabaseClientes = () => {
 
   const updateCliente = async (id: string, cliente: Partial<ClienteFormData>) => {
     try {
-      const adminUserId = getAdminUserId();
-      const { error: updateError } = await supabase.rpc('admin_update_cliente', {
-        p_admin_user_id: adminUserId,
-        p_cliente_id: id,
-        p_updates: cliente
-      });
+      const clienteAtual = clientes.find(c => c.id === id);
+
+      const { error: updateError } = await supabase
+        .from('clientes')
+        .update({
+          ...cliente,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
 
       if (updateError) throw updateError;
+
+      // Log
+      registrarLog({
+        tipo: 'cliente',
+        acao: 'editar_cliente',
+        descricao: `Cliente "${clienteAtual?.nome || cliente.nome || 'desconhecido'}" atualizado`,
+        entidade_tipo: 'cliente',
+        entidade_id: id,
+        detalhes: { campos_alterados: Object.keys(cliente) },
+      });
 
       await fetchClientes();
     } catch (err) {
@@ -244,13 +230,24 @@ export const useSupabaseClientes = () => {
 
   const deleteCliente = async (id: string) => {
     try {
-      const adminUserId = getAdminUserId();
-      const { error: deleteError } = await supabase.rpc('admin_delete_cliente', {
-        p_admin_user_id: adminUserId,
-        p_cliente_id: id
-      });
+      const clienteAtual = clientes.find(c => c.id === id);
+
+      const { error: deleteError } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
 
       if (deleteError) throw deleteError;
+
+      // Log
+      registrarLog({
+        tipo: 'cliente',
+        acao: 'excluir_cliente',
+        descricao: `Cliente "${clienteAtual?.nome || 'desconhecido'}" excluído`,
+        entidade_tipo: 'cliente',
+        entidade_id: id,
+        detalhes: { nome: clienteAtual?.nome, telefone: clienteAtual?.telefone },
+      });
 
       setClientes((prev) => prev.filter((c) => c.id !== id));
       setTodosClientes((prev) => prev.filter((c) => c.id !== id));
@@ -271,14 +268,8 @@ export const useSupabaseClientes = () => {
     const totalPedidos = todosClientes.reduce((acc, c) => acc + c.total_pedidos, 0);
     
     return {
-      total,
-      vip,
-      frequente,
-      ativo,
-      inativo,
-      novo,
-      totalGasto,
-      totalPedidos,
+      total, vip, frequente, ativo, inativo, novo,
+      totalGasto, totalPedidos,
       ticketMedioGeral: totalPedidos > 0 ? totalGasto / totalPedidos : 0,
     };
   };

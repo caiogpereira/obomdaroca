@@ -18,17 +18,22 @@ export interface HistoricoAcao {
 
 export interface Pedido {
   id: string;
-  numero?: number;
+  numero_pedido: string;
   cliente: string;
   nome_empresa?: string;
+  cpf_cnpj?: string;
   telefone: string;
   email?: string;
+  cep?: string;
   endereco?: string;
-  items: ItemPedido[];
-  total: number;
-  status: string;
-  forma_pagamento?: string;
+  cidade?: string;
+  estado?: string;
+  valor_total: number;
+  status: 'Novo' | 'Em Atendimento' | 'Pedido Separado' | 'Finalizado';
   observacoes?: string;
+  origem?: string;
+  modalidade_pagamento?: string;
+  forma_pagamento?: string;
   created_at: string;
   updated_at?: string;
   // Campos de operador
@@ -36,6 +41,8 @@ export interface Pedido {
   created_by_user_name?: string;
   updated_by_user_id?: string;
   updated_by_user_name?: string;
+  // Itens e histórico
+  itens: ItemPedido[];
   historico?: HistoricoAcao[];
 }
 
@@ -54,15 +61,17 @@ export interface Produto {
   id: string;
   codigo: string;
   nome: string;
-  preco: number; // Mantém para compatibilidade
+  preco: number;
   preco_varejo?: number;
   preco_cartao?: number;
   preco_pix?: number;
   preco_dinheiro?: number;
+  preco_oferta?: number;
   categoria?: string;
   subcategoria_id?: string;
   subcategoria?: string;
   marca?: string;
+  imagem_url?: string;
   image_url?: string;
   image_storage_path?: string;
   ativo?: boolean;
@@ -89,15 +98,17 @@ export interface Atendimento {
   id: string;
   cliente: string;
   telefone: string;
-  email?: string;
+  email: string;
   tipo_solicitacao: string;
   descricao: string;
   status: 'Aguardando' | 'Em Atendimento' | 'Resolvido';
   prioridade: 'Alta' | 'Normal' | 'Baixa';
+  created_by_user_id?: string;
+  updated_by_user_id?: string;
   created_at: string;
   updated_at: string;
-  is_read: boolean;
-  // NOVOS CAMPOS:
+  is_read?: boolean;
+  // Campos de arquivamento e rastreamento (NOVOS)
   archived_at?: string;
   resolved_at?: string;
   resolved_by_user_id?: string;
@@ -141,7 +152,7 @@ export type Periodo = 'hoje' | 'ontem' | '7dias' | 'semana' | 'mes' | 'personali
 
 export type ViewMode = 'table' | 'kanban';
 
-export type TabType = 'atendimentos' | 'dashboard' | 'produtos' | 'clientes' | 'notas';
+export type TabType = 'atendimentos' | 'dashboard' | 'produtos' | 'clientes';
 
 // ============================================
 // CRM - TIPOS DE CLIENTE
@@ -163,7 +174,7 @@ export interface Cliente {
   observacoes?: string;
   origem: 'manual' | 'whatsapp' | 'catalogo' | 'importacao';
   
-  // Métricas (calculadas automaticamente)
+  // Métricas
   segmento: SegmentoCliente;
   total_gasto: number;
   total_pedidos: number;
