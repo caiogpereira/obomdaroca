@@ -21,29 +21,22 @@ interface BloqueioAgente {
   ativo: boolean;
 }
 
-// Função para obter usuário atual
-const getUsuarioAtual = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('id, full_name')
-    .eq('id', user.id)
-    .maybeSingle();
-  
-  // Tentar também na tabela users
-  if (!profile) {
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('id, full_name')
-      .eq('id', user.id)
-      .maybeSingle();
-    
-    return userProfile ? { id: userProfile.id, nome: userProfile.full_name } : { id: user.id, nome: user.email || 'Sistema' };
+// =====================================================
+// FIX: Usar localStorage (auth customizada) ao invés de
+// supabase.auth.getUser() que SEMPRE retorna null neste projeto
+// Alinhado com o padrão usado em useSupabasePedidos.ts
+// =====================================================
+const getUsuarioAtual = () => {
+  try {
+    const session = localStorage.getItem('obdr_user_session');
+    if (session) {
+      const user = JSON.parse(session);
+      return { id: user.id, nome: user.full_name };
+    }
+  } catch (e) {
+    console.error('Erro ao obter usuário:', e);
   }
-  
-  return { id: profile.id, nome: profile.full_name };
+  return null;
 };
 
 export const useAgenteIA = () => {
@@ -93,9 +86,11 @@ export const useAgenteIA = () => {
   ): Promise<boolean> => {
     setLoading(true);
     try {
-      const usuario = await getUsuarioAtual();
+      // FIX: Agora lê do localStorage corretamente
+      const usuario = getUsuarioAtual();
+
       if (!usuario) {
-        console.error('Usuário não autenticado');
+        console.error('Usuário não autenticado (localStorage vazio)');
         return false;
       }
 

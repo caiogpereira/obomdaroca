@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Search, LayoutGrid, Table as TableIcon, Filter, Archive } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, LayoutGrid, Table as TableIcon, Filter, Archive, CheckCircle2 } from 'lucide-react';
 import { PedidosArquivadosModal } from '../components/PedidosArquivadosModal';
+import { AtendimentosArquivadosModal } from '../components/AtendimentosArquivadosModal';
 import { Pedido, ViewMode, Atendimento, Produto } from '../types';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { PedidosTable } from '../components/PedidosTable';
@@ -31,6 +32,16 @@ interface AtendimentosProps {
   onStatusChangeAtendimento: (id: string, status: Atendimento['status']) => void;
 }
 
+// Persistência da sub-seção ativa
+const SECTION_KEY = 'obdr_atendimentos_section';
+const getSavedSection = (): 'pedidos' | 'atendimentos' => {
+  try {
+    const saved = localStorage.getItem(SECTION_KEY);
+    if (saved === 'pedidos' || saved === 'atendimentos') return saved;
+  } catch {}
+  return 'pedidos';
+};
+
 export const Atendimentos = ({
   pedidos,
   produtos,
@@ -47,10 +58,20 @@ export const Atendimentos = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<Pedido['status'] | 'todos'>('todos');
   const [showFilters, setShowFilters] = useState(false);
-  const [showSection, setShowSection] = useState<'pedidos' | 'atendimentos'>('pedidos');
+  // Bug 5: Persistir sub-seção no localStorage
+  const [showSection, setShowSection] = useState<'pedidos' | 'atendimentos'>(getSavedSection);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [pedidoModalMode, setPedidoModalMode] = useState<'view' | 'edit'>('view');
-  const [showArquivados, setShowArquivados] = useState(false);
+  const [showArquivadosPedidos, setShowArquivadosPedidos] = useState(false);
+  const [showArquivadosAtendimentos, setShowArquivadosAtendimentos] = useState(false);
+
+  // Persistir sub-seção quando muda
+  useEffect(() => {
+    localStorage.setItem(SECTION_KEY, showSection);
+  }, [showSection]);
+
+  // Filtrar atendimentos: não exibir os arquivados na lista principal
+  const atendimentosAtivos = atendimentos.filter(a => !a.archived_at);
 
   const filteredPedidos = pedidos.filter((pedido) => {
     const matchesSearch =
@@ -99,15 +120,24 @@ export const Atendimentos = ({
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Atendimentos</h2>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Botões de Arquivados */}
             <button
-              onClick={() => setShowArquivados(true)}
+              onClick={() => setShowArquivadosPedidos(true)}
               className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
             >
               <Archive size={18} />
-              Arquivados
+              Pedidos Arquivados
+            </button>
+            <button
+              onClick={() => setShowArquivadosAtendimentos(true)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+            >
+              <CheckCircle2 size={18} />
+              Atendimentos Finalizados
             </button>
 
+            {/* Tabs de seção */}
             <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
               <button
                 onClick={() => setShowSection('pedidos')}
@@ -128,7 +158,7 @@ export const Atendimentos = ({
                 }`}
               >
                 Aguardando Atendimento
-                <NotificationBadge count={atendimentos.filter(a => a.status === 'Aguardando').length} />
+                <NotificationBadge count={atendimentosAtivos.filter(a => a.status === 'Aguardando').length} />
               </button>
             </div>
           </div>
@@ -188,7 +218,6 @@ export const Atendimentos = ({
 
             {showFilters && (
               <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtrar por Status</h3>
                 <div className="flex flex-wrap gap-2">
                   {statusOptions.map((option) => (
                     <button
@@ -237,7 +266,7 @@ export const Atendimentos = ({
         </>
       ) : (
         <AtendimentosQueue
-          atendimentos={atendimentos}
+          atendimentos={atendimentosAtivos}
           onAdd={onAddAtendimento}
           onUpdate={onUpdateAtendimento}
           onDelete={onDeleteAtendimento}
@@ -257,9 +286,14 @@ export const Atendimentos = ({
         />
       )}
 
-       <PedidosArquivadosModal
-        isOpen={showArquivados}
-        onClose={() => setShowArquivados(false)}
+      <PedidosArquivadosModal
+        isOpen={showArquivadosPedidos}
+        onClose={() => setShowArquivadosPedidos(false)}
+      />
+
+      <AtendimentosArquivadosModal
+        isOpen={showArquivadosAtendimentos}
+        onClose={() => setShowArquivadosAtendimentos(false)}
       />
     </div>
   );

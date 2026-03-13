@@ -6,7 +6,7 @@ import { Atendimentos } from './Atendimentos';
 import { Dashboard } from './Dashboard';
 import { Produtos } from './Produtos';
 import { Clientes } from './Clientes';
-import { NotasDoDia } from './NotasDoDia';
+import { LogsSistemaModal } from '../components/LogsSistemaModal';
 import { useSupabasePedidos } from '../hooks/useSupabasePedidos';
 import { useSupabaseProdutos } from '../hooks/useSupabaseProdutos';
 import { useSupabaseAtendimentos } from '../hooks/useSupabaseAtendimentos';
@@ -16,10 +16,31 @@ import { useNotifications } from '../hooks/useNotifications';
 import { TabType, Periodo } from '../types';
 import { generateReport } from '../utils/pdfGenerator';
 
+// =====================================================
+// Bug 5 FIX: Persistir aba ativa no localStorage
+// =====================================================
+const TAB_KEY = 'obdr_active_tab';
+const getSavedTab = (): TabType => {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (saved && ['atendimentos', 'dashboard', 'produtos', 'clientes'].includes(saved)) {
+      return saved as TabType;
+    }
+  } catch {}
+  return 'atendimentos';
+};
+
 export const AdminLayout = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('atendimentos');
+  // Bug 5: Inicializar a partir do localStorage
+  const [activeTab, setActiveTab] = useState<TabType>(getSavedTab);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
   const { showNotification } = useNotifications();
+
+  // Bug 5: Persistir quando muda
+  useEffect(() => {
+    localStorage.setItem(TAB_KEY, activeTab);
+  }, [activeTab]);
 
   // Define o título da página
   useEffect(() => {
@@ -108,6 +129,15 @@ export const AdminLayout = () => {
     }
   };
 
+  const handleGenerateReport = async (periodo: Periodo) => {
+    try {
+      await generateReport(periodo, pedidos);
+      setToast({ message: 'Relatório gerado com sucesso!', type: 'success' });
+    } catch (error) {
+      setToast({ message: (error as Error).message, type: 'error' });
+    }
+  };
+
   const handleAddProduto = async (produto: any) => {
     try {
       await addProduto(produto);
@@ -138,38 +168,33 @@ export const AdminLayout = () => {
   const handleDeleteMultipleProdutos = async (ids: string[]) => {
     try {
       await deleteMultipleProdutos(ids);
-      setToast({ message: `${ids.length} produto(s) excluído(s) com sucesso!`, type: 'success' });
+      setToast({ message: `${ids.length} produtos excluídos com sucesso!`, type: 'success' });
     } catch (error) {
       setToast({ message: (error as Error).message, type: 'error' });
     }
   };
 
-  const handleImportProdutos = async (produtos: any) => {
+  const handleImportProdutos = async (produtosData: any[]) => {
     try {
-      console.log('Iniciando importação de produtos:', produtos);
-      await importProdutos(produtos);
-      setToast({ message: `${produtos.length} produtos importados com sucesso!`, type: 'success' });
+      const result = await importProdutos(produtosData);
+      setToast({ message: `${produtosData.length} produtos importados com sucesso!`, type: 'success' });
     } catch (error) {
-      console.error('Erro completo ao importar produtos:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao importar produtos';
-      setToast({ message: `Erro ao importar produtos: ${errorMessage}`, type: 'error' });
+      setToast({ message: (error as Error).message, type: 'error' });
     }
   };
 
-  const handleAddCategoria = async (nome: string) => {
+  const handleAddCategoria = async (categoria: any) => {
     try {
-      await addCategoria(nome);
-      await refetchProdutos();
+      await addCategoria(categoria);
       setToast({ message: 'Categoria adicionada com sucesso!', type: 'success' });
     } catch (error) {
       setToast({ message: (error as Error).message, type: 'error' });
     }
   };
 
-  const handleUpdateCategoria = async (id: string, nome: string) => {
+  const handleUpdateCategoria = async (id: string, categoria: any) => {
     try {
-      await updateCategoria(id, nome);
-      await refetchProdutos();
+      await updateCategoria(id, categoria);
       setToast({ message: 'Categoria atualizada com sucesso!', type: 'success' });
     } catch (error) {
       setToast({ message: (error as Error).message, type: 'error' });
@@ -179,23 +204,9 @@ export const AdminLayout = () => {
   const handleDeleteCategoria = async (id: string) => {
     try {
       await deleteCategoria(id);
-      await refetchProdutos();
       setToast({ message: 'Categoria excluída com sucesso!', type: 'success' });
     } catch (error) {
       setToast({ message: (error as Error).message, type: 'error' });
-    }
-  };
-
-  const handleGenerateReport = (periodo: Periodo, metrics: any) => {
-    try {
-      generateReport({
-        periodo,
-        metrics,
-        pedidos,
-      });
-      setToast({ message: 'Relatório gerado com sucesso!', type: 'success' });
-    } catch (error) {
-      setToast({ message: 'Erro ao gerar relatório', type: 'error' });
     }
   };
 
@@ -275,7 +286,7 @@ export const AdminLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <Header onShowLogs={() => setShowLogs(true)} />
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -320,10 +331,6 @@ export const AdminLayout = () => {
             onDeleteCliente={handleDeleteCliente}
           />
         )}
-
-        {activeTab === 'notas' && (
-          <NotasDoDia />
-        )}
       </main>
 
       {toast && (
@@ -333,6 +340,12 @@ export const AdminLayout = () => {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* Modal de Logs do Sistema */}
+      <LogsSistemaModal
+        isOpen={showLogs}
+        onClose={() => setShowLogs(false)}
+      />
     </div>
   );
 };

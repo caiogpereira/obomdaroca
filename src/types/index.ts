@@ -89,17 +89,21 @@ export interface Atendimento {
   id: string;
   cliente: string;
   telefone: string;
-  email: string;
+  email?: string;
   tipo_solicitacao: string;
   descricao: string;
   status: 'Aguardando' | 'Em Atendimento' | 'Resolvido';
   prioridade: 'Alta' | 'Normal' | 'Baixa';
-  created_by_user_id?: string;
-  updated_by_user_id?: string;
   created_at: string;
   updated_at: string;
-  is_read?: boolean;
+  is_read: boolean;
+  // NOVOS CAMPOS:
   archived_at?: string;
+  resolved_at?: string;
+  resolved_by_user_id?: string;
+  resolved_by_user_name?: string;
+  assumed_by_user_id?: string;
+  assumed_by_user_name?: string;
 }
 
 export interface UserProfile {
