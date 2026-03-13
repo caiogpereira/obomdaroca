@@ -1,16 +1,14 @@
 import { supabase } from '../lib/supabase';
 
-const MAX_UPLOAD_SIZE = 50 * 1024; // 50kb no Storage
 const BUCKET_NAME = 'produtos-imagens';
 
 /**
- * Comprime uma imagem progressivamente até atingir o tamanho alvo.
- * Reduz dimensões e qualidade iterativamente.
+ * Comprime imagem para ~50KB usando Canvas
+ * - Reduz dimensões progressivamente
+ * - Aplica fundo branco (evita transparência que aumenta tamanho)
+ * - Salva sempre como JPEG
  */
-export const compressImage = async (
-  file: File,
-  maxSizeKB: number = 50
-): Promise<File> => {
+export const compressImage = async (file: File, targetSizeKB: number = 50): Promise<File> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -18,41 +16,41 @@ export const compressImage = async (
       const img = new Image();
 
       img.onload = () => {
-        const targetBytes = maxSizeKB * 1024;
+        const canvas = document.createElement('canvas');
 
-        // Começa com dimensão máxima de 800px
+        // Reduzir dimensão máxima para manter o arquivo pequeno
         let maxDimension = 800;
-        let quality = 0.85;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height / width) * maxDimension);
+            width = maxDimension;
+          } else {
+            width = Math.round((width / height) * maxDimension);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Falha ao criar contexto do canvas'));
+          return;
+        }
+
+        // Fundo branco (evita transparência PNG que aumenta tamanho)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const targetSize = targetSizeKB * 1024;
+        let quality = 0.7;
 
         const tryCompress = () => {
-          const canvas = document.createElement('canvas');
-          let { width, height } = img;
-
-          // Reduz dimensões proporcionalmente
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round((height / width) * maxDimension);
-              width = maxDimension;
-            } else {
-              width = Math.round((width / height) * maxDimension);
-              height = maxDimension;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            reject(new Error('Falha ao processar imagem'));
-            return;
-          }
-
-          // Fundo branco (evita transparência que aumenta tamanho)
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-
           canvas.toBlob(
             (blob) => {
               if (!blob) {
@@ -60,33 +58,28 @@ export const compressImage = async (
                 return;
               }
 
-              if (blob.size <= targetBytes) {
-                // Tamanho OK — retorna
-                const compressed = new File([blob], file.name, {
+              if (blob.size <= targetSize || quality <= 0.1) {
+                const compressedFile = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), {
                   type: 'image/jpeg',
                   lastModified: Date.now(),
                 });
-                resolve(compressed);
-                return;
-              }
-
-              // Ainda grande — reduz qualidade ou dimensão
-              if (quality > 0.2) {
-                quality -= 0.1;
-              } else if (maxDimension > 200) {
-                maxDimension = Math.round(maxDimension * 0.75);
-                quality = 0.7;
+                console.log(`📸 Imagem comprimida: ${Math.round(file.size / 1024)}KB → ${Math.round(blob.size / 1024)}KB (quality: ${quality.toFixed(1)})`);
+                resolve(compressedFile);
               } else {
-                // Limite atingido — aceita o menor possível
-                const compressed = new File([blob], file.name, {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                resolve(compressed);
-                return;
+                quality -= 0.1;
+                // Se quality está baixa e ainda grande, reduz dimensões
+                if (quality <= 0.3 && maxDimension > 400) {
+                  maxDimension = 400;
+                  width = Math.min(img.width, maxDimension);
+                  height = Math.round((img.height / img.width) * width);
+                  canvas.width = width;
+                  canvas.height = height;
+                  ctx.fillStyle = '#FFFFFF';
+                  ctx.fillRect(0, 0, width, height);
+                  ctx.drawImage(img, 0, 0, width, height);
+                }
+                tryCompress();
               }
-
-              tryCompress();
             },
             'image/jpeg',
             quality
@@ -105,60 +98,83 @@ export const compressImage = async (
   });
 };
 
+/**
+ * Upload de imagem do produto para o Supabase Storage
+ * - Comprime automaticamente
+ * - Salva na raiz do bucket (sem subpasta)
+ * - Retorna URL pública e path
+ */
 export const uploadProductImage = async (
-  file: File,
+  file: File, 
   productId: string
 ): Promise<{ url: string; path: string }> => {
   try {
-    // Sempre comprime para máximo 50kb
-    const compressed = await compressImage(file, 50);
+    // Sempre comprimir
+    const fileToUpload = await compressImage(file);
 
-    const fileExt = 'jpg'; // sempre salva como jpg após compressão
-    const fileName = `${productId}.${fileExt}`;
-    const filePath = fileName; // raiz do bucket, sem subpasta
+    // Nome do arquivo: productId-timestamp.jpg (na raiz, sem subpasta)
+    const fileName = `${productId}-${Date.now()}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(filePath, compressed, {
+      .upload(fileName, fileToUpload, {
         cacheControl: '3600',
         upsert: true,
         contentType: 'image/jpeg',
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Erro no upload:', uploadError);
+      throw uploadError;
+    }
 
     const { data } = supabase.storage
       .from(BUCKET_NAME)
-      .getPublicUrl(filePath);
+      .getPublicUrl(fileName);
+
+    console.log('✅ Imagem salva:', data.publicUrl);
 
     return {
       url: data.publicUrl,
-      path: filePath,
+      path: fileName,
     };
   } catch (error) {
-    console.error('Erro no upload de imagem:', error);
+    console.error('Erro ao fazer upload da imagem:', error);
     throw error;
   }
 };
 
+/**
+ * Remove imagem do Storage
+ */
 export const deleteProductImage = async (path: string): Promise<void> => {
   try {
-    const { error } = await supabase.storage.from(BUCKET_NAME).remove([path]);
-    if (error) throw error;
+    if (!path) return;
+    const { error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .remove([path]);
+
+    if (error) {
+      console.error('Erro ao deletar imagem:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Erro ao deletar imagem:', error);
-    throw error;
+    // Não propagar - deletar imagem antiga não deve bloquear o fluxo
   }
 };
 
+/**
+ * Validação de arquivo antes do upload
+ */
 export const validateImageFile = (file: File): string | null => {
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
   if (!validTypes.includes(file.type)) {
-    return 'Formato inválido. Use JPG, PNG, WEBP ou GIF.';
+    return 'Formato inválido. Use JPG, PNG ou WEBP.';
   }
 
-  // Aceita até 20MB para upload — comprime para 50kb automaticamente
+  // Aceitar até 20MB (vai ser comprimido para ~50KB)
   if (file.size > 20 * 1024 * 1024) {
     return 'Arquivo muito grande. Tamanho máximo: 20MB.';
   }
