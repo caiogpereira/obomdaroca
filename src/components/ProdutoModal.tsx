@@ -22,7 +22,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     categoria: produto?.categoria || '',
     subcategoria_id: produto?.subcategoria_id || '',
     marca: produto?.marca || '',
-    // FIX: usar image_url ao invés de imagem_url
     image_url: produto?.image_url || produto?.imagem_url || '',
     image_storage_path: produto?.image_storage_path || '',
   });
@@ -36,7 +35,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const [precoDinheiroDisplay, setPrecoDinheiroDisplay] = useState(produto?.preco_dinheiro ? produto.preco_dinheiro.toFixed(2) : '');
   
   const [imageFile, setImageFile] = useState<File | null>(null);
-  // FIX: preview carrega de image_url (campo correto do banco)
   const [imagePreview, setImagePreview] = useState<string>(produto?.image_url || produto?.imagem_url || '');
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -66,38 +64,58 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      try {
-        setUploadingImage(true);
-        let finalFormData = { 
-          ...formData,
-          preco: formData.preco_varejo,
-        };
+    if (!validate()) return;
 
-        // FIX: Upload de imagem funciona tanto para produtos novos quanto existentes
-        if (imageFile) {
-          // Usar o ID do produto existente OU o código como identificador
-          const imageId = produto?.id || formData.codigo.trim() || `new-${Date.now()}`;
-          const { url, path } = await uploadProductImage(imageFile, imageId);
-          finalFormData.image_url = url;
-          finalFormData.image_storage_path = path;
+    try {
+      setUploadingImage(true);
+      
+      // Construir o objeto final para salvar
+      const finalFormData: Record<string, any> = { 
+        ...formData,
+        preco: formData.preco_varejo,
+      };
 
-          // Se é edição e tinha imagem antiga, deletar
-          if (produto?.image_storage_path) {
-            await deleteProductImage(produto.image_storage_path);
-          }
+      console.log('🔵 handleSubmit - imageFile existe?', !!imageFile);
+      console.log('🔵 handleSubmit - formData.image_url antes do upload:', formData.image_url);
+
+      // Upload de imagem se houver arquivo selecionado
+      if (imageFile) {
+        const imageId = produto?.id || formData.codigo.trim() || `new-${Date.now()}`;
+        console.log('🔵 handleSubmit - iniciando upload para imageId:', imageId);
+        
+        const { url, path } = await uploadProductImage(imageFile, imageId);
+        
+        console.log('🔵 handleSubmit - upload retornou URL:', url);
+        console.log('🔵 handleSubmit - upload retornou path:', path);
+        
+        // Setar explicitamente no objeto final
+        finalFormData.image_url = url;
+        finalFormData.image_storage_path = path;
+
+        console.log('🔵 handleSubmit - finalFormData.image_url APÓS setar:', finalFormData.image_url);
+
+        // Se é edição e tinha imagem antiga, deletar a antiga
+        if (produto?.image_storage_path && produto.image_storage_path !== path) {
+          await deleteProductImage(produto.image_storage_path);
         }
-
-        if (inputMode === 'manual' && manualCategory.trim()) {
-          onSave({ ...finalFormData, subcategoria_id: manualCategory.trim() });
-        } else {
-          onSave(finalFormData);
-        }
-      } catch (err) {
-        console.error('Erro no submit:', err);
-        setErrors({ ...errors, image: err instanceof Error ? err.message : 'Erro ao fazer upload da imagem' });
-        setUploadingImage(false);
       }
+
+      console.log('🔵 handleSubmit - FINAL objeto que será enviado para onSave:', {
+        image_url: finalFormData.image_url,
+        image_storage_path: finalFormData.image_storage_path,
+        codigo: finalFormData.codigo,
+      });
+
+      // Chamar onSave com o objeto completo
+      if (inputMode === 'manual' && manualCategory.trim()) {
+        onSave({ ...finalFormData, subcategoria_id: manualCategory.trim() } as any);
+      } else {
+        onSave(finalFormData as any);
+      }
+    } catch (err) {
+      console.error('❌ handleSubmit erro:', err);
+      setErrors({ ...errors, image: err instanceof Error ? err.message : 'Erro ao fazer upload da imagem' });
+      setUploadingImage(false);
     }
   };
 
@@ -123,7 +141,6 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview('');
-    // FIX: limpar image_url (não imagem_url)
     setFormData({ ...formData, image_url: '', image_storage_path: '' });
   };
 
@@ -146,10 +163,7 @@ export const ProdutoModal = ({ produto, categorias, onSave, onClose }: ProdutoMo
     displaySetter: (val: string) => void,
     value: string
   ) => {
-    // Permitir digitação livre
     displaySetter(value);
-    
-    // Converter para número para o formData
     const numValue = parseFloat(value.replace(',', '.'));
     if (!isNaN(numValue)) {
       setFormData({ ...formData, [field]: numValue });
