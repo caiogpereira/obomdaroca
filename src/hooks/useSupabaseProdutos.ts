@@ -110,24 +110,38 @@ export const useSupabaseProdutos = () => {
         }
       }
 
+      // DEBUG: Log para diagnóstico de imagem
+      console.log('📦 addProduto - image_url recebido:', produto.image_url);
+      console.log('📦 addProduto - image_storage_path recebido:', produto.image_storage_path);
+
       const { data, error } = await supabase
         .from('produtos')
         .insert({
-          codigo: produto.codigo,
-          nome: produto.nome,
+          codigo: produto.codigo.trim(),
+          nome: produto.nome.trim(),
           preco: produto.preco,
+          preco_varejo: produto.preco_varejo || produto.preco || null,
           preco_cartao: produto.preco_cartao || null,
           preco_pix: produto.preco_pix || null,
           preco_dinheiro: produto.preco_dinheiro || null,
           preco_oferta: produto.preco_oferta || null,
-          image_url: produto.image_url || null,
-          image_storage_path: produto.image_storage_path || null,
+          marca: produto.marca || null,
+          // FIX: usar undefined check ao invés de || null (para preservar URLs válidas)
+          image_url: produto.image_url && produto.image_url.length > 0 ? produto.image_url : null,
+          image_storage_path: produto.image_storage_path && produto.image_storage_path.length > 0 ? produto.image_storage_path : null,
           subcategoria_id,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Já existe um produto com este código');
+        }
+        throw error;
+      }
+
+      console.log('✅ addProduto - resultado no banco:', data?.image_url);
 
       // Log
       registrarLog({
@@ -174,24 +188,52 @@ export const useSupabaseProdutos = () => {
         }
       }
 
-      const { error } = await supabase
+      // DEBUG: Log completo do que está sendo enviado
+      console.log('📝 updateProduto - dados recebidos:', {
+        id,
+        image_url: produto.image_url,
+        image_storage_path: produto.image_storage_path,
+        preco_varejo: produto.preco_varejo,
+        marca: produto.marca,
+      });
+
+      // FIX: Determinar image_url corretamente
+      // Se tem URL válida (não vazia), usar. Se vazia/undefined, manter null.
+      const imageUrl = produto.image_url && produto.image_url.length > 0 ? produto.image_url : null;
+      const imageStoragePath = produto.image_storage_path && produto.image_storage_path.length > 0 ? produto.image_storage_path : null;
+
+      console.log('📝 updateProduto - image_url que será gravado:', imageUrl);
+
+      const updateData: Record<string, any> = {
+        codigo: produto.codigo,
+        nome: produto.nome,
+        preco: produto.preco,
+        preco_varejo: produto.preco_varejo || produto.preco || null,
+        preco_cartao: produto.preco_cartao || null,
+        preco_pix: produto.preco_pix || null,
+        preco_dinheiro: produto.preco_dinheiro || null,
+        preco_oferta: produto.preco_oferta || null,
+        marca: produto.marca || null,
+        image_url: imageUrl,
+        image_storage_path: imageStoragePath,
+        subcategoria_id,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: updatedRows, error } = await supabase
         .from('produtos')
-        .update({
-          codigo: produto.codigo,
-          nome: produto.nome,
-          preco: produto.preco,
-          preco_cartao: produto.preco_cartao || null,
-          preco_pix: produto.preco_pix || null,
-          preco_dinheiro: produto.preco_dinheiro || null,
-          preco_oferta: produto.preco_oferta || null,
-          image_url: produto.image_url || null,
-          image_storage_path: produto.image_storage_path || null,
-          subcategoria_id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
+        .update(updateData)
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+
+      console.log('✅ updateProduto - resultado no banco:', updatedRows?.[0]?.image_url);
+
+      // Verificar se update afetou algo
+      if (!updatedRows || updatedRows.length === 0) {
+        console.error('⚠️ UPDATE retornou 0 rows — possível bloqueio RLS');
+      }
 
       // Log
       registrarLog({
@@ -200,7 +242,7 @@ export const useSupabaseProdutos = () => {
         descricao: `Produto "${produto.nome}" (${produto.codigo}) editado`,
         entidade_tipo: 'produto',
         entidade_id: id,
-        detalhes: { codigo: produto.codigo, nome: produto.nome, preco: produto.preco },
+        detalhes: { codigo: produto.codigo, nome: produto.nome, preco: produto.preco, image_url: imageUrl },
       });
 
       await fetchProdutos();
@@ -216,7 +258,6 @@ export const useSupabaseProdutos = () => {
       const { error } = await supabase.from('produtos').delete().eq('id', id);
       if (error) throw error;
 
-      // Log
       registrarLog({
         tipo: 'produto',
         acao: 'excluir_produto',
@@ -237,7 +278,6 @@ export const useSupabaseProdutos = () => {
       const { error } = await supabase.from('produtos').delete().in('id', ids);
       if (error) throw error;
 
-      // Log
       registrarLog({
         tipo: 'produto',
         acao: 'excluir_produto',
@@ -320,7 +360,6 @@ export const useSupabaseProdutos = () => {
         successCount += batch.length;
       }
 
-      // Log
       registrarLog({
         tipo: 'produto',
         acao: 'importar_produtos',
