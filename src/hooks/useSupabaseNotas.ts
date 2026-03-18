@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from './useLogsAtendimento';
 
 export interface NotaDoDia {
   id: string;
@@ -53,6 +54,21 @@ export const useSupabaseNotas = () => {
       if (insertError) throw insertError;
 
       setNotas((prev) => [data, ...prev]);
+
+      // Registrar log
+      registrarLog({
+        tipo: 'sistema',
+        acao: 'alterar_configuracao',
+        descricao: `Nota do dia adicionada por ${autor}: "${nota.mensagem.trim().substring(0, 80)}${nota.mensagem.trim().length > 80 ? '...' : ''}"`,
+        entidade_tipo: 'notas_do_dia',
+        entidade_id: data.id,
+        detalhes: {
+          mensagem: nota.mensagem.trim(),
+          autor,
+          expira_em: nota.expira_em || null,
+        },
+      });
+
       return data;
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao adicionar nota');
@@ -61,6 +77,8 @@ export const useSupabaseNotas = () => {
 
   const updateNota = async (id: string, nota: NotaDoDiaForm) => {
     try {
+      const notaAnterior = notas.find((n) => n.id === id);
+
       const { error: updateError } = await supabase
         .from('notas_do_dia')
         .update({
@@ -78,6 +96,20 @@ export const useSupabaseNotas = () => {
             : n
         )
       );
+
+      // Registrar log
+      registrarLog({
+        tipo: 'sistema',
+        acao: 'alterar_configuracao',
+        descricao: `Nota do dia editada: "${nota.mensagem.trim().substring(0, 80)}${nota.mensagem.trim().length > 80 ? '...' : ''}"`,
+        entidade_tipo: 'notas_do_dia',
+        entidade_id: id,
+        detalhes: {
+          mensagem_anterior: notaAnterior?.mensagem,
+          mensagem_nova: nota.mensagem.trim(),
+          expira_em: nota.expira_em || null,
+        },
+      });
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao atualizar nota');
     }
@@ -85,6 +117,8 @@ export const useSupabaseNotas = () => {
 
   const deleteNota = async (id: string) => {
     try {
+      const notaExcluida = notas.find((n) => n.id === id);
+
       const { error: deleteError } = await supabase
         .from('notas_do_dia')
         .delete()
@@ -93,12 +127,24 @@ export const useSupabaseNotas = () => {
       if (deleteError) throw deleteError;
 
       setNotas((prev) => prev.filter((n) => n.id !== id));
+
+      // Registrar log
+      registrarLog({
+        tipo: 'sistema',
+        acao: 'alterar_configuracao',
+        descricao: `Nota do dia excluida: "${notaExcluida?.mensagem?.substring(0, 80) || 'desconhecida'}${(notaExcluida?.mensagem?.length || 0) > 80 ? '...' : ''}"`,
+        entidade_tipo: 'notas_do_dia',
+        entidade_id: id,
+        detalhes: {
+          mensagem: notaExcluida?.mensagem,
+          autor: notaExcluida?.autor,
+        },
+      });
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Erro ao excluir nota');
     }
   };
 
-  // Verifica se uma nota está expirada
   const isExpirada = (nota: NotaDoDia): boolean => {
     if (!nota.expira_em) return false;
     const hoje = new Date();
