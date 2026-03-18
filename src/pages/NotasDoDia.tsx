@@ -26,7 +26,7 @@ export const NotasDoDia = () => {
 
     setSaving(true);
     try {
-      const autor = profile?.full_name || 'Usuário';
+      const autor = profile?.full_name || 'Usuario';
       await addNota(
         { mensagem: novaMensagem, expira_em: novaExpiraEm || null },
         autor
@@ -72,7 +72,7 @@ export const NotasDoDia = () => {
     try {
       await deleteNota(id);
       setDeleteConfirmId(null);
-      showToast('Nota excluída!', 'success');
+      showToast('Nota excluida!', 'success');
     } catch (err) {
       showToast((err as Error).message, 'error');
     }
@@ -97,13 +97,11 @@ export const NotasDoDia = () => {
     });
   };
 
-  // Contadores
   const notasAtivas = notas.filter((n) => !isExpirada(n));
   const notasExpiradas = notas.filter((n) => isExpirada(n));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -111,7 +109,7 @@ export const NotasDoDia = () => {
             Notas do Dia
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Recados e informações que o agente de IA usará para atender os clientes.
+            Recados e informacoes que o agente de IA usara para atender os clientes.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -126,7 +124,6 @@ export const NotasDoDia = () => {
         </div>
       </div>
 
-      {/* Formulário de nova nota */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -136,7 +133,7 @@ export const NotasDoDia = () => {
         <textarea
           value={novaMensagem}
           onChange={(e) => setNovaMensagem(e.target.value)}
-          placeholder="Ex: Queijo meia cura do fornecedor Nego chega na terça-feira. Ricota está em falta, sem previsão. Promoção de cocadas: 10% desconto acima de 10 unidades..."
+          placeholder="Ex: Queijo meia cura do fornecedor Nego chega na terca-feira. Ricota esta em falta, sem previsao. Promocao de cocadas: 10% desconto acima de 10 unidades..."
           rows={3}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
         />
@@ -156,7 +153,7 @@ export const NotasDoDia = () => {
               <button
                 onClick={() => setNovaExpiraEm('')}
                 className="text-gray-400 hover:text-gray-600"
-                title="Remover data de expiração"
+                title="Remover data de expiracao"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -179,16 +176,14 @@ export const NotasDoDia = () => {
         </div>
       </div>
 
-      {/* Dica */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
         <div className="text-sm text-blue-700">
-          <strong>Dica:</strong> Seja específico nas notas. Ao invés de "sem queijo", escreva "Queijo meia cura furadinho está em falta. Previsão de chegada: terça-feira 11/03". 
+          <strong>Dica:</strong> Seja especifico nas notas. Ao inves de &quot;sem queijo&quot;, escreva &quot;Queijo meia cura furadinho esta em falta. Previsao de chegada: terca-feira 11/03&quot;.
           Quanto mais detalhes, melhor o agente de IA consegue atender os clientes.
         </div>
       </div>
 
-      {/* Lista de Notas */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" />
@@ -218,7 +213,6 @@ export const NotasDoDia = () => {
                 }`}
               >
                 {isEditing ? (
-                  /* Modo Edição */
                   <div className="p-4 space-y-3">
                     <textarea
                       value={editMensagem}
@@ -265,7 +259,6 @@ export const NotasDoDia = () => {
                     </div>
                   </div>
                 ) : (
-                  /* Modo Visualização */
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -296,7 +289,6 @@ export const NotasDoDia = () => {
                         </div>
                       </div>
 
-                      {/* Botões de ação */}
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {isDeleting ? (
                           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
@@ -304,7 +296,7 @@ export const NotasDoDia = () => {
                             <button
                               onClick={() => handleDelete(nota.id)}
                               className="p-1 text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
-                              title="Confirmar exclusão"
+                              title="Confirmar exclusao"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
@@ -344,9 +336,8 @@ export const NotasDoDia = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-6 right-6 z-50">
           <div
             className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white ${
               toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'

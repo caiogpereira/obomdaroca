@@ -6,6 +6,7 @@ import { Atendimentos } from './Atendimentos';
 import { Dashboard } from './Dashboard';
 import { Produtos } from './Produtos';
 import { Clientes } from './Clientes';
+import { NotasDoDia } from './NotasDoDia';
 import { LogsSistemaModal } from '../components/LogsSistemaModal';
 import { useSupabasePedidos } from '../hooks/useSupabasePedidos';
 import { useSupabaseProdutos } from '../hooks/useSupabaseProdutos';
@@ -23,7 +24,7 @@ const TAB_KEY = 'obdr_active_tab';
 const getSavedTab = (): TabType => {
   try {
     const saved = localStorage.getItem(TAB_KEY);
-    if (saved && ['atendimentos', 'dashboard', 'produtos', 'clientes'].includes(saved)) {
+    if (saved && ['atendimentos', 'dashboard', 'produtos', 'clientes', 'notas'].includes(saved)) {
       return saved as TabType;
     }
   } catch {}
@@ -330,6 +331,10 @@ export const AdminLayout = () => {
             onUpdateCliente={handleUpdateCliente}
             onDeleteCliente={handleDeleteCliente}
           />
+        )}
+
+	{activeTab === 'notas' && (
+          <NotasDoDia />
         )}
       </main>
 
